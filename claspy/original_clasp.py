@@ -277,12 +277,9 @@ class ClaSP:
 
         if validation is not None:
             validation_test = map_validation_tests(validation)
-            if not validation_test(self, cp, threshold): 
-                #print(cp, 'is NOT significant CP')
-                return None
+            if not validation_test(self, cp, threshold): return None
 
         if sparse is True:
-            #print(cp, 'is a significant CP')
             return cp
 
         return self.time_series[:cp], self.time_series[cp:]

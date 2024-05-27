@@ -112,15 +112,11 @@ class BinaryClaSPSegmentation:
         bool
             True if the candidate change point is valid, False otherwise.
         """
-        
         for change_point in [0] + change_points + [self.n_timepoints]:
             left_begin = max(0, change_point - self.min_seg_size)
             right_end = min(self.n_timepoints, change_point + self.min_seg_size)
-            if candidate in range(left_begin, right_end): 
-                print('candidate', candidate, 'is NOT valid')
-                return False
-            
-        print('candidate', candidate, 'is valid')
+            if candidate in range(left_begin, right_end): return False
+
         return True
 
     def _local_segmentation(self, lbound, ubound, change_points):
