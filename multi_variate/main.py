@@ -1,5 +1,5 @@
 import sys
-sys.path.append('/Users/lucreziavaleriani/claspy')
+sys.path.append('../claspy')
 
 import os
 import argparse
