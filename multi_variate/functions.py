@@ -85,8 +85,7 @@ def my_split(clasp,
     if validation is not None:
         validation_test = map_validation_tests(validation)
         if not validation_test(clasp, cp, threshold): 
-            # print(cp, 'Not significant CP')
-            return None
+            return 0 #None
 
     if sparse is True:
         return cp
@@ -114,7 +113,7 @@ def local_segmentation(lbound,
                        n_timepoints):
 
     if ubound - lbound < 2 * min_seg_size: 
-        return
+        return clasp_tree, queue, 0
 
     clasp = ClaSPEnsemble(
         n_estimators=n_estimators,
@@ -131,13 +130,13 @@ def local_segmentation(lbound,
     cp = my_split(clasp, clasp.profile, validation=validation, threshold=threshold)
     if cp is None: 
         #print('cp is None')
-        return clasp_tree, queue, None
+        return clasp_tree, queue, 0
     
     score = clasp.profile[cp]
 
     if not cp_is_valid(lbound + cp, change_points, n_timepoints, min_seg_size):  #candidate, change_points, n_timepoints, min_seg_size
         #print('cp is not valid')
-        return clasp_tree, queue, None
+        return clasp_tree, queue, 0
 
     clasp_tree.append(((lbound, ubound), clasp))
     queue.put((-score, len(clasp_tree) - 1))    
@@ -225,40 +224,56 @@ def find_cp_iterative(dr_clasp, dr_tree, dr_queue, dr_profile,
             break
         
         if dr_queue.qsize() > 0:
-            dr_priority, dr_clasp_tree_idx = dr_queue.get_nowait()
+            dr_priority, dr_clasp_tree_idx = dr_queue.get()
             (dr_lbound, dr_ubound), dr_clasp = dr_tree[dr_clasp_tree_idx]
-            #print(f'DR: {(dr_lbound, dr_ubound)}, {dr_priority}')
+            dr_cp = dr_lbound + my_split(dr_clasp, dr_clasp.profile, validation=validation, threshold=threshold)
+            dr_profile[dr_lbound:dr_ubound - window_size + 1] = np.max([dr_profile[dr_lbound:dr_ubound - window_size + 1], dr_clasp.profile], axis=0)
+            prof_dr = dr_clasp.profile
         
+        else:
+            dr_cp = 0
+            dr_priority = 0
+            prof_dr = np.array([])
+            
         
         if baf_queue.qsize() > 0:
-            baf_priority, baf_clasp_tree_idx = baf_queue.get_nowait()
+            baf_priority, baf_clasp_tree_idx = baf_queue.get()
             (baf_lbound, baf_ubound), baf_clasp = baf_tree[baf_clasp_tree_idx]
-            #print(f'BAF: {(baf_lbound, baf_ubound)}, {baf_priority}')
+            baf_cp = baf_lbound + my_split(baf_clasp, baf_clasp.profile, validation=validation, threshold=threshold)
+            baf_profile[baf_lbound:baf_ubound - window_size + 1] = np.max([baf_profile[baf_lbound:baf_ubound - window_size + 1], baf_clasp.profile], axis=0)
+            prof_baf = baf_clasp.profile
+        else:
+            baf_cp = 0
+            baf_priority = 0
+            prof_baf = np.array([])
+        
         
         if vaf_queue.qsize() > 0:
-            vaf_priority, vaf_clasp_tree_idx = vaf_queue.get_nowait()
+            vaf_priority, vaf_clasp_tree_idx = vaf_queue.get()
             (vaf_lbound, vaf_ubound), vaf_clasp = vaf_tree[vaf_clasp_tree_idx]
-            #print(f'VAF: {(vaf_lbound, vaf_ubound)}, {vaf_priority}')
+            vaf_cp = vaf_lbound + my_split(vaf_clasp, vaf_clasp.profile, validation=validation, threshold=threshold)
+            vaf_profile[vaf_lbound:vaf_ubound - window_size + 1] = np.max([vaf_profile[vaf_lbound:vaf_ubound - window_size + 1], vaf_clasp.profile], axis=0)
+            prof_vaf = vaf_clasp.profile
+        else:
+            vaf_cp = 0
+            vaf_priority = 0
+            prof_vaf = np.array([])
+            
         
         
-        dr_cp = dr_lbound + my_split(dr_clasp, dr_clasp.profile, validation=validation, threshold=threshold)
-        baf_cp = baf_lbound + my_split(baf_clasp, baf_clasp.profile, validation=validation, threshold=threshold)
-        vaf_cp = vaf_lbound + my_split(vaf_clasp, vaf_clasp.profile, validation=validation, threshold=threshold)
-        print(f'DR: {dr_cp}, BAF: {baf_cp}, VAF: {vaf_cp}')
-        
-        dr_profile[dr_lbound:dr_ubound - window_size + 1] = np.max([dr_profile[dr_lbound:dr_ubound - window_size + 1], dr_clasp.profile], axis=0)
-        baf_profile[baf_lbound:baf_ubound - window_size + 1] = np.max([baf_profile[baf_lbound:baf_ubound - window_size + 1], baf_clasp.profile], axis=0)
-        vaf_profile[vaf_lbound:vaf_ubound - window_size + 1] = np.max([vaf_profile[vaf_lbound:vaf_ubound - window_size + 1], vaf_clasp.profile], axis=0)
-
-        
-        all_bound = [(dr_lbound, dr_ubound), (baf_lbound, baf_ubound), (vaf_lbound, vaf_ubound)]
+        all_bound = [(dr_lbound, dr_ubound), 
+                     (baf_lbound, baf_ubound), 
+                     (vaf_lbound, vaf_ubound)]
         all_cp = [dr_cp, baf_cp, vaf_cp]
         all_score = [dr_priority, baf_priority, vaf_priority]
+        all_profile = [prof_dr, prof_baf, prof_vaf]
+        all_profile = np.array([prof for prof in all_profile if prof.size != 0])
         
         
         if mode == 'most_common': 
             count = Counter(all_cp) 
             keep_cp, _ = count.most_common(1)[0]  
+            
             
         elif mode == 'max': # max score
             idx = np.argmax(np.abs(all_score))
@@ -266,13 +281,13 @@ def find_cp_iterative(dr_clasp, dr_tree, dr_queue, dr_profile,
             
             
         elif mode == 'mult':
-            new_score = dr_clasp.profile * baf_clasp.profile
+            new_score = np.prod(all_profile, axis = 0)#prof_dr * prof_baf * prof_vaf
             new_score[new_score == np.inf] = -10000
             keep_cp = dr_lbound + np.argmax(new_score)
             
             
         elif mode == 'sum':
-            new_score = dr_clasp.profile + baf_clasp.profile
+            new_score = prof_dr + prof_baf + prof_vaf
             new_score[new_score == np.inf] = -10000
             keep_cp = dr_lbound + np.argmax(new_score/3)
             
