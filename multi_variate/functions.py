@@ -150,6 +150,7 @@ def take_first_cp(dr_profile,
                   mode):    
     
     cps = [np.argmax(dr_profile), np.argmax(vaf_profile), np.argmax(baf_profile)]
+    print(cps)
     scores = [max(dr_profile), max(vaf_profile), max(baf_profile)]
 
     if mode == 'most_common':

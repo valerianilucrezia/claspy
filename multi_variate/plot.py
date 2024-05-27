@@ -1,3 +1,6 @@
+import sys
+sys.path.append('/orfeo/LTS/LADE/LT_storage/lvaleriani/CNA/segmentation/claspy')
+
 from queue import PriorityQueue
 from claspy.utils import check_input_time_series, check_excl_radius
 from claspy.clasp import ClaSPEnsemble
