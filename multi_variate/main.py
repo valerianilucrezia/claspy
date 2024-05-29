@@ -43,7 +43,6 @@ if __name__ == '__main__':
     for c in combinations[11:]:
         path = os.path.join(base, c)
         if os.path.isdir(path) and c[0] == 'c':
-            print(path)
     
             #in_file = os.path.join(path, 'smooth_snv.csv')   
             in_file = os.path.join(path, 'Sample1/seq_res_snv_smooth.csv')

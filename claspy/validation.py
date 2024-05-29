@@ -31,8 +31,40 @@ def significance_test(clasp, change_point, threshold=1e-15):
     """
     _, y_pred = cross_val_labels(clasp.knn.offsets, change_point-clasp.lbound, clasp.window_size)
     _, p = ranksums(y_pred[:change_point], y_pred[change_point:])
+    #print('pvalue=', p)
+    
     return p <= threshold
 
+
+def significance_test_2(clasp, change_point, lbound, threshold=1e-15):
+    """
+    Perform a significance test on a candidate change point using the provided ClaSP.
+
+    Parameters
+    ----------
+    clasp : ClaSP
+        A fitted ClaSP object to use for the significance test.
+    change_point : int
+        The candidate change point to test.
+    threshold : float, optional (default=1e-15)
+        The p-value threshold for significance. The default value is 1e-15.
+
+    Returns
+    -------
+    bool
+        True if the change point is significant, False otherwise.
+
+    Notes
+    -----
+    This method uses a two-sample rank-sum test with a p-value threshold to determine if a candidate change point
+    is statistically significant. The test is performed using the classification labels for the candidate change point.
+    If the resulting p-value is less than or equal to the specified threshold, the change point is considered significant
+    and the method returns True. Otherwise, the change point is considered not significant and the method returns False.
+
+    """
+    _, y_pred = cross_val_labels(clasp.knn.offsets, change_point-lbound, clasp.window_size)
+    _, p = ranksums(y_pred[:change_point], y_pred[change_point:])
+    return p <= threshold
 
 def score_threshold(clasp, change_point, threshold=0.75):
     """
