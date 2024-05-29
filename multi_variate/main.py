@@ -34,16 +34,19 @@ if __name__ == '__main__':
     mode = args.mode
     
     base = '/orfeo/LTS/LADE/LT_storage/lvaleriani/CNA/segmentation/sim_data_races/data_races/sim_1'
+    #base = '/orfeo/LTS/LADE/LT_storage/lvaleriani/CNA/segmentation/sim_data_races/data_races/sim_2'
     combinations = os.listdir(base) 
     
     out_path = '/orfeo/LTS/LADE/LT_storage/lvaleriani/CNA/segmentation/res_races/claspy/sim_1/'
     
-    for c in combinations:
+    # print(combinations)
+    for c in combinations[11:]:
         path = os.path.join(base, c)
-        if os.path.isdir(path):
+        if os.path.isdir(path) and c[0] == 'c':
             print(path)
     
-            in_file = os.path.join(path, 'Sample1', 'seq_res_snv_smooth.csv')        
+            #in_file = os.path.join(path, 'smooth_snv.csv')   
+            in_file = os.path.join(path, 'Sample1/seq_res_snv_smooth.csv')
             output_dir = os.path.join(out_path, c)
             os.makedirs(output_dir, exist_ok=True)
                 
@@ -105,18 +108,20 @@ if __name__ == '__main__':
                                                                                                 baf_clasp, baf_tree, baf_queue, baf_range, baf_profile,
                                                                                                 vaf_clasp, vaf_tree, vaf_queue, vaf_range, vaf_profile)
 
-
+            #try:
             CP =  find_cp_iterative(dr_clasp, dr_tree, dr_queue, dr_profile,
-                                baf_clasp, baf_tree, baf_queue, baf_profile,
-                                vaf_clasp, vaf_tree, vaf_queue, vaf_profile,
-                                n_segments, validation, threshold, window_size, min_seg_size,
-                                n_estimators, k_neighbours, distance, scored, early_stopping, 
-                                excl_radius, n_jobs, random_state, n_timepoints, 
-                                dr, baf, vaf, 
-                                mode)
+                                    baf_clasp, baf_tree, baf_queue, baf_profile,
+                                    vaf_clasp, vaf_tree, vaf_queue, vaf_profile,
+                                    n_segments, validation, threshold, window_size, min_seg_size,
+                                    n_estimators, k_neighbours, distance, scored, early_stopping, 
+                                    excl_radius, n_jobs, random_state, n_timepoints, 
+                                    dr, baf, vaf, 
+                                    mode)
 
             plot_profile(dr, baf, vaf, bps, CP, 
-                        title = mode, 
-                        save = True, 
-                        out_file = output_dir, 
-                        mode = mode)
+                            title = mode, 
+                            save = True, 
+                            out_file = output_dir, 
+                            mode = mode)
+            #except:
+            #    pass

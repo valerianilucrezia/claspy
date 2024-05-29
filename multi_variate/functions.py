@@ -128,15 +128,19 @@ def local_segmentation(lbound,
     ).fit(time_series[lbound:ubound], validation=validation, threshold=threshold)
 
     cp = my_split(clasp, clasp.profile, validation=validation, threshold=threshold)
-    if cp is None: 
-        #print('cp is None')
-        return clasp_tree, queue, 0
+    # if cp is None: 
+    #     score = 0
+    #     return clasp_tree, queue, 0
     
     score = clasp.profile[cp]
+    
+    # if cp is None: 
+    #     score = 0
 
     if not cp_is_valid(lbound + cp, change_points, n_timepoints, min_seg_size):  #candidate, change_points, n_timepoints, min_seg_size
-        #print('cp is not valid')
-        return clasp_tree, queue, 0
+        score = 0 #print('cp is not valid')
+        #print(clasp_tree)
+        #return clasp_tree, queue, 0
 
     clasp_tree.append(((lbound, ubound), clasp))
     queue.put((-score, len(clasp_tree) - 1))    
@@ -224,8 +228,12 @@ def find_cp_iterative(dr_clasp, dr_tree, dr_queue, dr_profile,
             print('Stop because queue is empty')
             break
         
+        #print(idx)
+        print(dr_tree, 'DR')
         if dr_queue.qsize() > 0:
+            print(dr_queue.queue)
             dr_priority, dr_clasp_tree_idx = dr_queue.get()
+            print(dr_clasp_tree_idx)
             (dr_lbound, dr_ubound), dr_clasp = dr_tree[dr_clasp_tree_idx]
             dr_cp = dr_lbound + my_split(dr_clasp, dr_clasp.profile, validation=validation, threshold=threshold)
             dr_profile[dr_lbound:dr_ubound - window_size + 1] = np.max([dr_profile[dr_lbound:dr_ubound - window_size + 1], dr_clasp.profile], axis=0)
@@ -236,38 +244,43 @@ def find_cp_iterative(dr_clasp, dr_tree, dr_queue, dr_profile,
             dr_priority = 0
             prof_dr = np.array([])
             
-        
+        print(baf_tree, 'BAF')
         if baf_queue.qsize() > 0:
+            print(baf_queue.queue)
             baf_priority, baf_clasp_tree_idx = baf_queue.get()
+            print(baf_clasp_tree_idx)
             (baf_lbound, baf_ubound), baf_clasp = baf_tree[baf_clasp_tree_idx]
             baf_cp = baf_lbound + my_split(baf_clasp, baf_clasp.profile, validation=validation, threshold=threshold)
             baf_profile[baf_lbound:baf_ubound - window_size + 1] = np.max([baf_profile[baf_lbound:baf_ubound - window_size + 1], baf_clasp.profile], axis=0)
             prof_baf = baf_clasp.profile
+        
         else:
             baf_cp = 0
             baf_priority = 0
             prof_baf = np.array([])
         
-        
+        #print(vaf_tree, 'VAF')
         if vaf_queue.qsize() > 0:
             vaf_priority, vaf_clasp_tree_idx = vaf_queue.get()
             (vaf_lbound, vaf_ubound), vaf_clasp = vaf_tree[vaf_clasp_tree_idx]
             vaf_cp = vaf_lbound + my_split(vaf_clasp, vaf_clasp.profile, validation=validation, threshold=threshold)
             vaf_profile[vaf_lbound:vaf_ubound - window_size + 1] = np.max([vaf_profile[vaf_lbound:vaf_ubound - window_size + 1], vaf_clasp.profile], axis=0)
             prof_vaf = vaf_clasp.profile
+            
         else:
             vaf_cp = 0
             vaf_priority = 0
             prof_vaf = np.array([])
             
         
-        
         all_bound = [(dr_lbound, dr_ubound), 
                      (baf_lbound, baf_ubound), 
                      (vaf_lbound, vaf_ubound)]
+        #print(all_bound)
         all_cp = [dr_cp, baf_cp, vaf_cp]
         all_score = [dr_priority, baf_priority, vaf_priority]
         all_profile = [prof_dr, prof_baf, prof_vaf]
+        
         all_profile = np.array([prof for prof in all_profile if prof.size != 0])
         
         
@@ -282,13 +295,13 @@ def find_cp_iterative(dr_clasp, dr_tree, dr_queue, dr_profile,
             
             
         elif mode == 'mult':
-            new_score = np.prod(all_profile, axis = 0)#prof_dr * prof_baf * prof_vaf
+            new_score = np.prod(all_profile, axis = 0) #prof_dr * prof_baf * prof_vaf
             new_score[new_score == np.inf] = -10000
             keep_cp = dr_lbound + np.argmax(new_score)
             
             
         elif mode == 'sum':
-            new_score = prof_dr + prof_baf + prof_vaf
+            new_score = np.sum(all_profile, axis = 0)
             new_score[new_score == np.inf] = -10000
             keep_cp = dr_lbound + np.argmax(new_score/3)
             
@@ -305,6 +318,8 @@ def find_cp_iterative(dr_clasp, dr_tree, dr_queue, dr_profile,
             
             low = prange[0]
             high = prange[1]
+
+            print('\n DR')
             dr_tree, dr_queue, dr_scores_tmp = local_segmentation(low, 
                                                                 high, 
                                                                 CP, 
@@ -324,7 +339,7 @@ def find_cp_iterative(dr_clasp, dr_tree, dr_queue, dr_profile,
                                                                 dr_tree, 
                                                                 dr_queue,
                                                                 n_timepoints)
-            
+            print('\n BAF')
             baf_tree, baf_queue, baf_scores_tmp = local_segmentation(low, 
                                                                     high, 
                                                                     CP, 
@@ -344,7 +359,8 @@ def find_cp_iterative(dr_clasp, dr_tree, dr_queue, dr_profile,
                                                                     baf_tree, 
                                                                     baf_queue,
                                                                     n_timepoints)
-            
+
+            print('\n VAF')
             vaf_tree, vaf_queue, vaf_scores_tmp = local_segmentation(low, 
                                                                     high, 
                                                                     CP, 
@@ -365,7 +381,7 @@ def find_cp_iterative(dr_clasp, dr_tree, dr_queue, dr_profile,
                                                                     vaf_queue,
                                                                     n_timepoints)
             
-            #print(f'scores = {dr_scores_tmp}, {baf_scores_tmp}, {vaf_scores_tmp}')
+            print(f'scores = {dr_scores_tmp}, {baf_scores_tmp}, {vaf_scores_tmp}')
             if dr_scores_tmp != None:
                 dr_scores.append(dr_scores_tmp)
                 
