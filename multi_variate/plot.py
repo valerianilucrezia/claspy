@@ -57,6 +57,7 @@ def get_original_data_plot(data = '/Users/lucreziavaleriani/Desktop/seq_res_snv_
     plot_data(snv)            
     if save and out_file!= '':
         plt.savefig(fname = os.path.join(out_file, 'original_data.png'))
+    plt.close()
     
     return vaf, baf, dr, bps
 
@@ -68,22 +69,33 @@ def plot_profile(dr_profile, baf_profile, vaf_profile,
                  out_file = '', 
                  mode = ''):
     
-    fig = plt.figure(figsize=(10, 6))
-    ax = plt.subplot(111)
+    # fig = plt.figure(figsize=(10, 6))
+    fig, axs = plt.subplots(nrows = 3, ncols = 1, figsize=(10, 8))
+    # ax = plt.subplot(111)
 
-    plt.plot(dr_profile, label = "DR")
-    plt.plot(baf_profile, label = 'BAF')
-    plt.plot(vaf_profile, label = 'VAF')
+    axs[0].plot(dr_profile, label = "DR")
+    axs[1].plot(baf_profile, label = 'BAF')
+    axs[2].plot(vaf_profile, label = 'VAF')
     
-    plt.vlines(true_bps, ymin = 0, ymax = 2, colors = 'tab:pink', label = 'True BP')
-    plt.vlines(pred_bps, ymin = 0, ymax = 2, colors = 'tab:cyan', label = 'Predicted BP')
+    axs[0].set_ylabel('DR')
+    axs[1].set_ylabel('BAF')
+    axs[2].set_ylabel('VAF')
+    
+    axs[0].vlines(true_bps, ymin = min(dr_profile) - 0.05, ymax = max(dr_profile) + 0.05, colors = 'tab:green', label = 'True BP', linestyles = 'dashed')
+    axs[0].vlines(pred_bps, ymin = min(dr_profile), ymax = max(dr_profile), colors = 'tab:olive',  label = 'Predicted BP')
 
-    ax.legend(loc='upper left', bbox_to_anchor=(1.04, 1))
-    plt.title(title)
-    plt.tight_layout()
-    #plt.show()
+    axs[1].vlines(true_bps, ymin = min(baf_profile) - 0.05, ymax = max(baf_profile) + 0.05, colors = 'tab:green', label = 'True BP', linestyles = 'dashed')
+    axs[1].vlines(pred_bps, ymin = min(baf_profile), ymax = max(baf_profile), colors = 'tab:olive', label = 'Predicted BP')
+    
+    axs[2].vlines(true_bps, ymin = min(vaf_profile) - 0.05, ymax = max(vaf_profile) + 0.05, colors = 'tab:green', label = 'True BP', linestyles = 'dashed')
+    axs[2].vlines(pred_bps, ymin = min(vaf_profile), ymax = max(vaf_profile), colors = 'tab:olive', label = 'Predicted BP')
+
+
+    #axs.legend(loc='upper left', bbox_to_anchor=(1.04, 1))
+    fig.suptitle(title)
+    fig.tight_layout()
     
     if save and out_file != '':
-        plt.savefig(os.path.join(out_file, mode + '_result.png'))
-    
+        plt.savefig(os.path.join(out_file, mode + '_result.png'), dpi = 500)
+    plt.close()
     return
