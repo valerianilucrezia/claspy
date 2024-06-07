@@ -36,7 +36,7 @@ def plot_data(snv):
     return
 
 
-def get_original_data_plot(data = '/Users/lucreziavaleriani/Desktop/seq_res_snv_smooth.csv', 
+def get_original_data_plot(data = '', 
                            save = False, 
                            out_file = '/Users/lucreziavaleriani/Desktop/original.png'):
     
