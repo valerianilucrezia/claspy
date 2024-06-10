@@ -18,8 +18,8 @@ def get_data(data = '/orfeo/LTS/LADE/LT_storage/lvaleriani/CNA/segmentation/res_
     snv = pd.read_csv(data, sep = '\t')
     
     vaf = np.array(snv.gt_AF)
-    baf = np.array(snv.median_baf)
-    dr = np.array(snv.median_dr)
+    baf = np.array(snv.mean_baf)
+    dr = np.array(snv.mean_dr)
     
     return vaf, baf, dr
 
