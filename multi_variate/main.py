@@ -72,7 +72,7 @@ if __name__ == '__main__':
                     bps = np.sort(bps)[1:-1]
                     print(bps)
                     np.save(file = f'{os.path.join(out_dir, sim)}/{c}_bp.npy', arr = np.array(bps))
-
+                    
                     time_series = np.array([vaf, baf, dr])
                     n_timepoints = time_series.shape[1]
 

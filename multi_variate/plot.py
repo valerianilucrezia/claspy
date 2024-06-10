@@ -14,6 +14,15 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 
+def get_data(data = '/orfeo/LTS/LADE/LT_storage/lvaleriani/CNA/segmentation/res_nanopore/data/smooth_data.tsv'):
+    snv = pd.read_csv(data, sep = '\t')
+    
+    vaf = np.array(snv.gt_AF)
+    baf = np.array(snv.median_baf)
+    dr = np.array(snv.median_dr)
+    
+    return vaf, baf, dr
+
 
 def plot_data(snv):
     sns.set_theme(style="white", font_scale=1.5)
