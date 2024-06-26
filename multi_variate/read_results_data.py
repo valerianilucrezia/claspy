@@ -7,7 +7,7 @@ list_thr = []
 list_wd = []
 list_res = []
 
-input_dir = '/Users/lucreziavaleriani/Desktop/res_nanopore/claspy'
+input_dir = '/Users/lucreziavaleriani/Desktop/orfeo_LTS/CNA/segmentation/res_nanopore/claspy/median/'
 results = os.listdir(input_dir)
         
 for f in results:
@@ -35,32 +35,3 @@ print(df_res)
 df_res.to_csv(input_dir + '/results.tsv', 
             sep= "\t", 
             index = False) 
-
-
-# list_sim = []
-# list_comb = []
-# list_bp = []
-# for s in range(1,21):
-#     sim = f'sim_{s}'
-#     path = os.path.join(base, sim)
-#     print(path)
-#     combinations = os.listdir(path)
-    
-#     for c in combinations:
-#         filename, extension = os.path.splitext(c)
-#         if extension == '.npy':
-#             if c[0] == 'c':
-#                 real_bp = list(np.load(f'{path}/{c}'))
-#                 list_sim.append(sim)
-#                 list_comb.append('_'.join(filename.split('_')[0:-1]))
-#                 list_bp.append(real_bp)
-    
-# df_real = pd.DataFrame({'sim_id':list_sim,
-#                         'comb':list_comb,
-#                         'real_bp':list_bp})
-# df_real.to_csv('/orfeo/LTS/LADE/LT_storage/lvaleriani/CNA/segmentation/res_races/claspy/bps.tsv', 
-#               sep= "\t", 
-#               index = False)  
-                    
-                    
-                    
