@@ -12,7 +12,7 @@ from claspy.segmentation import BinaryClaSPSegmentation
 from claspy.validation import map_validation_tests
 
 thr = [1e-15, 1e-10, 1e-5]
-wsize = [5,10,50]
+wsize = [5, 10]
 
 
 distance = "euclidean_distance" 
@@ -50,8 +50,9 @@ if __name__ == '__main__':
         for threshold in thr:
             print('Threshold:', threshold)
             name = f'{mode}_{window_size}_{threshold}'
-            vaf, baf, dr = get_data(in_file)
-
+            vaf, baf, dr, maf = get_data(in_file)
+            
+            
             time_series = np.array([vaf, baf, dr])
             n_timepoints = time_series.shape[1]
 
@@ -97,31 +98,60 @@ if __name__ == '__main__':
                                 validation, 
                                 threshold, 
                                 n_segments)
-
-
-                cp = take_first_cp(dr_profile, vaf_profile, baf_profile, mode)
-                dr_tree, dr_queue, baf_tree, baf_queue, vaf_tree, vaf_queue, cp = validate_first_cp(cp, 
-                                                                                                    threshold, validation_test,
-                                                                                                    dr_clasp, dr_tree, dr_queue, dr_range, dr_profile,
-                                                                                                    baf_clasp, baf_tree, baf_queue, baf_range, baf_profile,
-                                                                                                    vaf_clasp, vaf_tree, vaf_queue, vaf_range, vaf_profile)
-
                 
-                CP =  find_cp_iterative(dr_clasp, dr_tree, dr_queue, dr_profile,
+                if type(maf) == type(np.array([1,2,3])):
+                    maf_clasp, maf_profile, maf_cp, maf_range, maf_tree, maf_queue = get_first_cp(maf, n_estimators,
+                                window_size, 
+                                k_neighbours,
+                                distance,
+                                scored,
+                                early_stopping,
+                                excl_radius,
+                                n_jobs, 
+                                random_state, 
+                                validation, 
+                                threshold, 
+                                n_segments)
+                    
+                    cp = take_first_cp(dr_profile, vaf_profile, baf_profile, mode, maf_profile)
+                    dr_tree, dr_queue, baf_tree, baf_queue, vaf_tree, vaf_queue, maf_tree, maf_queue, cp = validate_first_cp(cp, threshold, validation_test,
+                                                                                                                dr_clasp, dr_tree, dr_queue, dr_range, dr_profile,
+                                                                                                                baf_clasp, baf_tree, baf_queue, baf_range, baf_profile,
+                                                                                                                vaf_clasp, vaf_tree, vaf_queue, vaf_range, vaf_profile,
+                                                                                                                maf_clasp, maf_tree, maf_queue, maf_range, maf_profile)
+
+                    
+                    CP =  MAF_find_cp_iterative(dr_clasp, dr_tree, dr_queue, dr_profile,
                                             baf_clasp, baf_tree, baf_queue, baf_profile,
                                             vaf_clasp, vaf_tree, vaf_queue, vaf_profile,
                                             n_segments, validation, threshold, window_size, min_seg_size,
                                             n_estimators, k_neighbours, distance, scored, early_stopping, 
                                             excl_radius, n_jobs, random_state, n_timepoints, 
-                                            dr, baf, vaf, 
-                                            mode)
+                                            dr, baf, vaf,
+                                            mode,
+                                            maf_clasp, maf_tree, maf_queue, maf_profile, maf)
                     
-                np.save(file = f'{output_dir}/{name}.npy', arr = np.array(CP))
-                # plot_profile(dr, baf, vaf, bps, CP, 
-                #                     title = f'{c}-{name}', 
-                #                     save = True, 
-                #                     out_file = output_dir, 
-                #                     mode = f'{mode}_{name}')
+                    np.save(file = f'{output_dir}/{name}_maf.npy', arr = np.array(CP))
+                else:
+
+                    cp = take_first_cp(dr_profile, vaf_profile, baf_profile, mode)
+                    dr_tree, dr_queue, baf_tree, baf_queue, vaf_tree, vaf_queue, cp = validate_first_cp(cp, 
+                                                                                                        threshold, validation_test,
+                                                                                                        dr_clasp, dr_tree, dr_queue, dr_range, dr_profile,
+                                                                                                        baf_clasp, baf_tree, baf_queue, baf_range, baf_profile,
+                                                                                                        vaf_clasp, vaf_tree, vaf_queue, vaf_range, vaf_profile)
+
+                    
+                    CP =  find_cp_iterative(dr_clasp, dr_tree, dr_queue, dr_profile,
+                                                baf_clasp, baf_tree, baf_queue, baf_profile,
+                                                vaf_clasp, vaf_tree, vaf_queue, vaf_profile,
+                                                n_segments, validation, threshold, window_size, min_seg_size,
+                                                n_estimators, k_neighbours, distance, scored, early_stopping, 
+                                                excl_radius, n_jobs, random_state, n_timepoints, 
+                                                dr, baf, vaf, 
+                                                mode)
+                        
+                    np.save(file = f'{output_dir}/{name}.npy', arr = np.array(CP))
             except:
-                print(f'Not pass: {name}')
-                pass
+               print(f'Not pass: {name}')
+               pass

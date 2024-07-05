@@ -16,12 +16,14 @@ import seaborn as sns
 
 def get_data(data = '/orfeo/LTS/LADE/LT_storage/lvaleriani/CNA/segmentation/res_nanopore/data/smooth_data.tsv'):
     snv = pd.read_csv(data, sep = '\t')
+    snv.fillna(value=0, axis = 0, inplace = True)
     
     vaf = np.array(snv.gt_AF)
-    baf = np.array(snv.mean_baf)
-    dr = np.array(snv.mean_dr)
+    baf = np.array(snv.median_baf)
+    dr = np.array(snv.median_dr)
+    maf = np.array(snv.median_meth)
     
-    return vaf, baf, dr
+    return vaf, baf, dr, maf
 
 
 def plot_data(snv):

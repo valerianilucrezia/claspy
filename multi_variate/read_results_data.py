@@ -7,12 +7,13 @@ list_thr = []
 list_wd = []
 list_res = []
 
-input_dir = '/Users/lucreziavaleriani/Desktop/res_nanopore/claspy'
+input_dir = '/orfeo/LTS/LADE/LT_storage/lvaleriani/CNA/segmentation/res_nanopore/claspy/median'
 results = os.listdir(input_dir)
         
 for f in results:
     filename, extension = os.path.splitext(f)
-    if extension == '.npy':
+    if extension == '.npy' and filename.split('_')[-1] == 'maf':
+        print(filename)
         file_res = os.path.join(input_dir, f)
 
         mode = filename.split('_')[0]
@@ -32,7 +33,7 @@ df_res = pd.DataFrame({'mode':list_mode,
             'res':list_res})
 print(df_res)
 
-df_res.to_csv(input_dir + '/results.tsv', 
+df_res.to_csv(input_dir + '/results_maf_median.tsv', 
             sep= "\t", 
             index = False) 
 
