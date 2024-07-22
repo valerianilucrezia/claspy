@@ -14,6 +14,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 
+# TODO: this is not called from what I can tell and is duplicated in get_original_data_plot
 def get_data(data = '/orfeo/LTS/LADE/LT_storage/lvaleriani/CNA/segmentation/res_nanopore/data/smooth_data.tsv'):
     snv = pd.read_csv(data, sep = '\t')
     snv.fillna(value=0, axis = 0, inplace = True)
@@ -50,7 +51,8 @@ def plot_data(snv):
 def get_original_data_plot(data = '', 
                            save = False, 
                            out_file = '/Users/lucreziavaleriani/Desktop/original.png'):
-    
+    # return dict to keep track of variable names
+    ret_dict = {}
     snv = pd.read_csv(data)
     snv.fillna(value='normal', axis = 0, inplace = True)
     snv.sort_values(by = ['pos'], inplace = True)
@@ -58,22 +60,22 @@ def get_original_data_plot(data = '',
                     
     bps_max = list(snv.groupby(['cna_id']).max(['pos']).id)
     bps_min = list(snv.groupby(['cna_id']).min(['pos']).id)
-    bps = np.array(bps_max + bps_min)                
+    ret_dict["bps"] = np.array(bps_max + bps_min)                
     vaf_bps = snv.groupby('cna_id')
                     
-    vaf = np.array(snv.vaf)
-    baf = np.array(snv.median_baf)
-    dr = np.array(snv.median_dr)
+    ret_dict["vaf"] = np.array(snv.vaf)
+    ret_dict["baf"] = np.array(snv.median_baf)
+    ret_dict["dr"] = np.array(snv.median_dr)
                 
     plot_data(snv)            
     if save and out_file!= '':
         plt.savefig(fname = os.path.join(out_file, 'original_data.png'))
     plt.close()
     
-    return vaf, baf, dr, bps
+    return ret_dict
 
 
-def plot_profile(dr_profile, baf_profile, vaf_profile, 
+def plot_profile(multivariate_clasp_objects, 
                  true_bps, pred_bps = [],
                  title = '', 
                  save = False, 
@@ -83,23 +85,13 @@ def plot_profile(dr_profile, baf_profile, vaf_profile,
     # fig = plt.figure(figsize=(10, 6))
     fig, axs = plt.subplots(nrows = 3, ncols = 1, figsize=(10, 8))
     # ax = plt.subplot(111)
-
-    axs[0].plot(dr_profile, label = "DR")
-    axs[1].plot(baf_profile, label = 'BAF')
-    axs[2].plot(vaf_profile, label = 'VAF')
-    
-    axs[0].set_ylabel('DR')
-    axs[1].set_ylabel('BAF')
-    axs[2].set_ylabel('VAF')
-    
-    axs[0].vlines(true_bps, ymin = min(dr_profile) - 0.05, ymax = max(dr_profile) + 0.05, colors = 'tab:green', label = 'True BP', linestyles = 'dashed')
-    axs[0].vlines(pred_bps, ymin = min(dr_profile), ymax = max(dr_profile), colors = 'tab:olive',  label = 'Predicted BP')
-
-    axs[1].vlines(true_bps, ymin = min(baf_profile) - 0.05, ymax = max(baf_profile) + 0.05, colors = 'tab:green', label = 'True BP', linestyles = 'dashed')
-    axs[1].vlines(pred_bps, ymin = min(baf_profile), ymax = max(baf_profile), colors = 'tab:olive', label = 'Predicted BP')
-    
-    axs[2].vlines(true_bps, ymin = min(vaf_profile) - 0.05, ymax = max(vaf_profile) + 0.05, colors = 'tab:green', label = 'True BP', linestyles = 'dashed')
-    axs[2].vlines(pred_bps, ymin = min(vaf_profile), ymax = max(vaf_profile), colors = 'tab:olive', label = 'Predicted BP')
+    variables = multivariate_clasp_objects.keys()
+    for i in range(0, len(variables)-1):
+        profile = multivariate_clasp_objects[variables[i]].profile
+        axs[i].plot(profile, label = variables)
+        axs[i].set_ylabel(variables[i])
+        axs[i].vlines(true_bps, ymin = min(profile) - 0.05, ymax = max(profile) + 0.05, colors = 'tab:green', label = 'True BP', linestyles = 'dashed')
+        axs[i].vlines(pred_bps, ymin = min(profile), ymax = max(profile), colors = 'tab:olive',  label = 'Predicted BP')
 
 
     #axs.legend(loc='upper left', bbox_to_anchor=(1.04, 1))
