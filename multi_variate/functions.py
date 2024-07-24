@@ -18,7 +18,7 @@ Class: multivariateClaSP
 Inherits from BinaryClaSPSegmentation from claspy package
 
 """
-class multivariateClaSP(BinaryClaSPSegmentation):
+class MultivariateClaSPSegmentation(BinaryClaSPSegmentation):
     def __init__(self, time_series, n_segments="learn", n_estimators=10, window_size="suss", k_neighbours=3, distance="znormed_euclidean_distance", score="roc_auc", early_stopping=True, validation="significance_test", threshold=1e-15, excl_radius=5, n_jobs=-1, random_state=2357):
         super().__init__(n_segments, n_estimators, window_size, k_neighbours, distance, score, early_stopping, validation, threshold, excl_radius, n_jobs, random_state)
         
