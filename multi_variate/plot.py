@@ -14,19 +14,43 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-# TODO: this is not called from what I can tell and is duplicated in get_original_data_plot
-def get_data(data = '/orfeo/LTS/LADE/LT_storage/lvaleriani/CNA/segmentation/res_nanopore/data/smooth_data.tsv'):
+# specific function to call if input file is a .tsv
+def get_data_tsv(data: str):
+    # return dict to keep track of variable names
+    ret_dict = {}
     snv = pd.read_csv(data, sep = '\t')
     snv.fillna(value=0, axis = 0, inplace = True)
     
-    vaf = np.array(snv.gt_AF)
-    baf = np.array(snv.median_baf)
-    dr = np.array(snv.median_dr)
-    maf = np.array(snv.median_meth)
+    ret_dict["vaf"] = np.array(snv.gt_AF)
+    ret_dict["baf"] = np.array(snv.median_baf)
+    ret_dict["dr"] = np.array(snv.median_dr)
+    ret_dict["maf"] = np.array(snv.median_meth)
     
-    return vaf, baf, dr, maf
+    return ret_dict
 
+# specific funtion to call if a function is a .csv
+def get_data_csv(data: str):
+    # return dict to keep track of variable names
+    ret_dict = {}
 
+    snv = pd.read_csv(data)
+    snv.fillna(value='normal', axis = 0, inplace = True)
+    snv.sort_values(by = ['pos'], inplace = True)
+    snv['id'] = [i for i in range(snv.shape[0])]
+                    
+    bps_max = list(snv.groupby(['cna_id']).max(['pos']).id)
+    bps_min = list(snv.groupby(['cna_id']).min(['pos']).id)               
+    vaf_bps = snv.groupby('cna_id')
+                    
+    ret_dict["vaf"] = np.array(snv.vaf)
+    ret_dict["baf"] = np.array(snv.median_baf)
+    ret_dict["maf"] = np.array(snv.median_meth)
+    ret_dict["dr"] = np.array(snv.median_dr)
+    ret_dict["bps"] = np.array(bps_max + bps_min) 
+    
+    return ret_dict
+
+# TODO Combine next two functions
 def plot_data(snv):
     sns.set_theme(style="white", font_scale=1.5)
     fig, axes = plt.subplots(2, 3, figsize=(25, 6))
@@ -48,33 +72,16 @@ def plot_data(snv):
     return
 
 
-def get_original_data_plot(data = '', 
-                           save = False, 
-                           out_file = '/Users/lucreziavaleriani/Desktop/original.png'):
-    # return dict to keep track of variable names
-    ret_dict = {}
-    snv = pd.read_csv(data)
-    snv.fillna(value='normal', axis = 0, inplace = True)
-    snv.sort_values(by = ['pos'], inplace = True)
-    snv['id'] = [i for i in range(snv.shape[0])]
-                    
-    bps_max = list(snv.groupby(['cna_id']).max(['pos']).id)
-    bps_min = list(snv.groupby(['cna_id']).min(['pos']).id)
-    ret_dict["bps"] = np.array(bps_max + bps_min)                
-    vaf_bps = snv.groupby('cna_id')
-                    
-    ret_dict["vaf"] = np.array(snv.vaf)
-    ret_dict["baf"] = np.array(snv.median_baf)
-    ret_dict["dr"] = np.array(snv.median_dr)
-                
+def get_original_data_plot(data: str,
+                           out_dir: str = None,
+                           save: bool = False):
+    snv = pd.read_csv(data)         
     plot_data(snv)            
-    if save and out_file!= '':
-        plt.savefig(fname = os.path.join(out_file, 'original_data.png'))
+    if save and out_dir is not None:
+        plt.savefig(fname = os.path.join(out_dir, 'original_data.png'))
     plt.close()
-    
-    return ret_dict
 
-
+# TODO could be decoupled (plotting and saving)
 def plot_profile(multivariate_clasp_objects, 
                  true_bps, pred_bps = [],
                  title = '', 
