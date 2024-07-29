@@ -1,22 +1,13 @@
-from queue import PriorityQueue
 from claspy.utils import check_input_time_series, check_excl_radius
 from claspy.clasp import ClaSPEnsemble
 from claspy.validation import map_validation_tests
-from claspy.validation import significance_test_2
 from claspy.validation import significance_test
 from claspy.segmentation import BinaryClaSPSegmentation
-
 import numpy as np
-
-import os
-import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
 
 """
 Class: multivariateClaSP
 Inherits from BinaryClaSPSegmentation from claspy package
-
 """
 class MultivariateClaSPSegmentation(BinaryClaSPSegmentation):
     def __init__(self, time_series, n_segments="learn", n_estimators=10, window_size="suss", k_neighbours=3, distance="znormed_euclidean_distance", score="roc_auc", early_stopping=True, validation="significance_test", threshold=1e-15, excl_radius=5, n_jobs=-1, random_state=2357):
@@ -27,7 +18,6 @@ class MultivariateClaSPSegmentation(BinaryClaSPSegmentation):
 
         # self.min_seg_size = self.window_size * self.excl_radius
     def get_first_cp(self):
-        
         check_input_time_series(self.time_series)
         check_excl_radius(self.k_neighbours, self.excl_radius)
 

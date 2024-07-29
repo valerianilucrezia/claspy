@@ -5,8 +5,8 @@ import os
 import numpy as np
 import argparse
 
-from plot import *
-from functions import *
+from multi_variate.data_import import *
+from multi_variate.multivariate_segmentation import *
 
 from claspy.segmentation import BinaryClaSPSegmentation
 from claspy.validation import map_validation_tests

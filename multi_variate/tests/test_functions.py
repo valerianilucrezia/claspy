@@ -1,5 +1,5 @@
 from unittest import TestCase, main
-import functions
+import multivariate_segmentation as multivariate_segmentation
 
 class TestMultivariateClaSPSegementation(TestCase):
     def setUp(self) -> None:

@@ -1,5 +1,5 @@
 from unittest import TestCase
-from main import MultivariateClaSP
+from multivariate_clasp import MultivariateClaSP
 import pickle as pkl
 
 """check if results (cp) have changed from original MVP run. If changed, test fails"""
