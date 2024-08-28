@@ -7,16 +7,35 @@ import numpy as np
 
 """
 Class: multivariateClaSP
-Inherits from BinaryClaSPSegmentation from claspy package
-"""
+Class that takes in a time series of an allele frequency and finds change points. Inherits from BinaryClaSPSegmentation from claspy package
+    Inputs:
+        - input: allele frequency time series
+        - mode: str of either sum, max, or multi. Denotes the method for deriving a change point
+        - out_dir: str of path to store outputs
+        - frequencies: list of strings denoting the gene frequencies to be used. default is ["vaf", "baf", "dr"]
+        - n_segments: method for detecting time series segments. default is "learn"
+        - n_estimators: default 10
+        - window_size: default 5
+        - k_neighbors: default 3
+        - distance: default "euclidian_distance"
+        - score: default "roc_auc"
+        - early_stopping: default True
+        - validation: method for detecting the significance of a change point. default is "significance_test"
+        - threshold: float of significance threshold. default is 1e-15
+        - excl_radius: default 5
+        - n_jobs: default 1
+        - random_state: default 2357
+    Methods:
+    get_first_cp: find first change point in a given time series
+    """
+
 class MultivariateClaSPSegmentation(BinaryClaSPSegmentation):
-    def __init__(self, time_series, n_segments="learn", n_estimators=10, window_size="suss", k_neighbours=3, distance="znormed_euclidean_distance", score="roc_auc", early_stopping=True, validation="significance_test", threshold=1e-15, excl_radius=5, n_jobs=-1, random_state=2357):
+    def __init__(self, time_series, n_segments="learn", n_estimators=10, window_size=5, k_neighbours=3, distance="euclidean_distance", score="roc_auc", early_stopping=True, validation="significance_test", threshold=1e-15, excl_radius=5, n_jobs=1, random_state=2357):
         super().__init__(n_segments, n_estimators, window_size, k_neighbours, distance, score, early_stopping, validation, threshold, excl_radius, n_jobs, random_state)
         
         self.time_series = time_series
         self.min_seg_size = self.window_size * self.excl_radius
 
-        # self.min_seg_size = self.window_size * self.excl_radius
     def get_first_cp(self):
         check_input_time_series(self.time_series)
         check_excl_radius(self.k_neighbours, self.excl_radius)
@@ -24,8 +43,7 @@ class MultivariateClaSPSegmentation(BinaryClaSPSegmentation):
         n_timepoints = self.time_series.shape[0]
         min_seg_size = self.window_size * self.excl_radius
         
-        
-        self.queue = [] #PriorityQueue()
+        self.queue = []
         self.clasp_tree = []
         
         if n_segments == "learn":
@@ -51,6 +69,7 @@ class MultivariateClaSPSegmentation(BinaryClaSPSegmentation):
         self.profile = self.clasp.profile
         return(self.clasp, self.profile, self.cp, self.prange, self.clasp_tree, self.queue)
     
+    # FIXME not used, so change points aren't validated
     def local_segmentation(self, lbound, ubound, change_points):
 
         if ubound - lbound < 2 * self.min_seg_size: 
@@ -74,20 +93,23 @@ class MultivariateClaSPSegmentation(BinaryClaSPSegmentation):
         
         # FIXME: score is originally a string argument and here (and below) it is reclassified as int. Change name?
         self.score = self.clasp.profile[cp]
-        #print('cp, score=', cp, score)
         
         if not cp_is_valid(lbound + cp, change_points, self.n_timepoints, self.min_seg_size):  #candidate, change_points, n_timepoints, min_seg_size
-            #print('cp is not valid')
-            #return clasp_tree, queue, 0
             self.score = 0
 
-        self.clasp_tree.append(((lbound, ubound), self.clasp))
-        #queue.put((-score, len(clasp_tree) - 1))    
+        self.clasp_tree.append(((lbound, ubound), self.clasp))   
         self.queue.append((-self.score, len(self.clasp_tree) - 1))
         return self.clasp_tree, self.queue, self.score
 
 
-"""Check that a change point is valid"""
+"""Function to check that a given change point is valid
+    Input:
+    - candidate: change point to check
+    - change_points: list of change points
+    - n_timepoints: length of time series??
+    - min_seg_size: window_size * excl_radius
+    Return:
+        - Bool of whether the change point is valid or not"""
 def cp_is_valid(candidate, 
                 change_points, 
                 n_timepoints, 
@@ -104,7 +126,9 @@ def cp_is_valid(candidate,
 
 
 """This function can return a value of None if the significance test for the change points is not significant, or return the change point
-    Successive functions that use my_split check that the return value is/not None"""
+    Successive functions that use my_split check that the return value is/not None
+    
+    """
 def my_split(clasp, 
             profile, 
             sparse=True, 
