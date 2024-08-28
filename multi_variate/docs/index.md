@@ -1,12 +1,12 @@
 # Home
 
 ## About
-Locate is a tool for identifying mutated segments across multiple allele frequencies.
+mv-clasp is a tool for identifying mutated segments across multiple allele frequencies.
 
 ## Installation
 In a conda environment:
 ```
-pip install locate
+pip install mv-clasp
 ```
 !!! tip
     For support in configuring a conda environment see the [conda documentation website].
@@ -14,7 +14,7 @@ pip install locate
 ## Usage
 ### Detecting change points:
 ```
-from locate import MultivariateClaSP
+from mv_clasp import MultivariateClaSP
 
 mc = MultivariateClaSP(./allele_frequencies_data.filetype, mode, ./results_directory/)
 

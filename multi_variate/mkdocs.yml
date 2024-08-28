@@ -1,4 +1,5 @@
-site_name: LOCATE
+site_name: multivariate_claspy
+
 plugins:
   - mkdocstrings
   - tags
