@@ -1,0 +1,32 @@
+site_name: multivariate_claspy
+
+plugins:
+  - mkdocstrings
+  - tags
+  - blog
+  - search
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+
+theme:
+  name: material
+  palette:
+    - scheme: slate
+
+  features:
+    - navigation.sections
+    - navigation.indexes
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.path
+    - toc.integrate
+
+nav:
+  - Home: index.md
+  - Documentation:
+    - Importing data: data_import.md
+    - Change point detection: multivariateClaSP.md
+    - Clustering segments: cluster.md
+  
