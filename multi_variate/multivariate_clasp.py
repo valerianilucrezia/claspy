@@ -18,7 +18,7 @@ class MultivariateClaSP:
     Args:
         input (str): The path to a csv file holding gene frequencies (vaf, baf, dr, etc.).
 
-        mode (str): Denotes the method for deriving a change point, either sum, max, or multi.
+        mode (str): Denotes the method for deriving a change point, either sum, max, or mult.
 
         out_dir (str): The path to store outputs.
 
@@ -94,6 +94,8 @@ class MultivariateClaSP:
         # should be all that is needed as input is already checked
         if self.out_dir is None:
             self.out_dir = os.path.dirname(self.input)
+        if os.path.isdir(self.out_dir) is False:
+            os.mkdir(self.out_dir)
         if type(self.mode) != str or self.mode in ["max", "sum", "mult"] is False:
             raise TypeError(f"mode must be string of one of the following options: max, sum, mult")
         # if all(self.kwargs["frequencies"], str) is False:
@@ -119,7 +121,7 @@ class MultivariateClaSP:
             for i in self.frequencies:
                 ts_obj = BinaryClaSPSegmentation(**self.kwargs)
                 ts_obj.fit(original_data[i])
-                ts_obj.axes = ts_obj.plot()
+                # ts_obj.axes = ts_obj.plot()
                 self.all_cps.update(ts_obj.change_points)
                 self.multivariate_clasp_objects[i] = ts_obj
 
@@ -128,24 +130,39 @@ class MultivariateClaSP:
             pass
     
 
-    def plot_original_data(self, save: bool = False):
-        """Plot original data of input time series
+    def plot_original_data(self,
+                           title: None | str = None,
+                           save: bool = False):
+        """Plot original data of input time series with detected changepoints drawn
 
         Args:
             save (bool, optional): Parameter specifying whether the figure should be saved to the out_dir, by default False. Defaults to False.
         """
 
-        snv = pd.read_csv(self.input)
-        snv.plot(x="pos", y=self.frequencies)   
+        variables = list(self.multivariate_clasp_objects.keys())
+        fig, axs = plt.subplots(nrows = len(variables), ncols = 1, figsize=(10, 8))
+
+        for i in range(0, len(variables)):
+            profile = self.multivariate_clasp_objects[variables[i]].time_series
+            bps = self.multivariate_clasp_objects[variables[i]].change_points
+            axs[i].plot(profile, label=str(variables[i]))
+            axs[i].set_ylabel(str(variables[i]))
+            axs[i].vlines(bps, ymin = min(profile) - 0.05, ymax = max(profile) + 0.05, colors = 'tab:green', label = 'Predicted BP', linestyles = 'dashed')
+
+        if title is not None:
+            fig.suptitle(title)
+
+        fig.tight_layout()
+
         if save:
-            plt.savefig(fname = os.path.join(self.out_dir, 'original_data.png'))
-        plt.close()
+            fig.savefig(os.path.join(self.out_dir, f'{self.name}_timeseries.png'), dpi = 500)
+
 
 
     def plot_combined_profile(self,
                               title: None | str = None, 
                               save: bool = False):
-        """Plot time series representations of all used gene frequencies with identified change points
+        """Plot CLASP profiles with identified change points
 
         Args:
             title (None | str, optional): A title for the produced figure. Defaults to None.
@@ -154,18 +171,19 @@ class MultivariateClaSP:
 
         
         variables = list(self.multivariate_clasp_objects.keys())
-        fig, axs = plt.subplots(nrows = len(variables), ncols = 2, figsize=(10, 8))
+        fig, axs = plt.subplots(nrows = len(variables), ncols = 1, figsize=(10, 8))
 
-        for i in range(0, len(variables)-1):
-            ax = self.multivariate_clasp_objects[variables[i]].axes
-            axs[i,0].add_artist(ax[0])
-            axs[i,1].add_artist(ax[1])
+        for i in range(0, len(variables)):
+            profile = self.multivariate_clasp_objects[variables[i]].profile
+            bps = self.multivariate_clasp_objects[variables[i]].change_points
+            axs[i].plot(profile, label=str(variables[i]))
+            axs[i].set_ylabel(str(variables[i]))
+            axs[i].vlines(bps, ymin = min(profile) - 0.05, ymax = max(profile) + 0.05, colors = 'tab:green', label = 'Predicted BP', linestyles = 'dashed')
 
         if title is not None:
             fig.suptitle(title)
+            
         fig.tight_layout()
-        
-        if save:
-            plt.savefig(os.path.join(self.out_dir, f'{self.mode}_{title}_result.png'), dpi = 500)
 
-        plt.close()
+        if save:
+            fig.savefig(os.path.join(self.out_dir, f'{self.name}_profiles.png'), dpi = 500)
