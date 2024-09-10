@@ -8,6 +8,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from claspy.segmentation import BinaryClaSPSegmentation
+from validation import score_threshold, significance_test
 
 from data_import import get_data_csv, get_data_tsv
 
@@ -109,6 +110,8 @@ class MultivariateClaSP:
 
         # returns dictionary to preserve variable names
         original_data = get_data_csv(self.input, self.frequencies)
+        # update to account for frequencies not present in input csv
+        self.frequencies = original_data.keys()
 
         # sort bps
         # FIXME remove bps after we know sims work
@@ -128,7 +131,168 @@ class MultivariateClaSP:
         except:
             print(f'Not passed: {self.name}')
             pass
+
     
+    # def get_all_changepoints_rewritten(self):
+    #     conservative_cps = []
+    #     # get clasp score from each ts for each validated changepoint
+        
+    #     # find ts with largest number of segments and use that as n_segments
+    #     n_segments = max([len(self.multivariate_clasp_objects[freq].n_segments) for freq in self.frequencies])
+    #     # access queues from each segment
+    #     # queues = [len(self.multivariate_clasp_objects[freq].queue) for freq in self.frequencies]
+
+    #     for i in range(n_segments - 1):
+    #     #     if all(len(ls) == 0 for ls in queues):
+    #     #         break
+    #     #     for i in range(len(self.frequencies)):
+
+    #     # for idx, pos in enumerate(self.all_cps):
+    #         # the change point
+    #         change_points = []
+    #         scores_at_cp = []
+    #         profiles = []
+    #         for freq in self.frequencies:
+    #         # change_points = [self.multivariate_clasp_objects[freq].change_points[i] for freq in self.frequencies]
+    #             try:
+    #                 cp = self.multivariate_clasp_objects[freq].change_points[i]
+    #                 score = self.multivariate_clasp_objects[freq].profile[cp]
+    #                 profiles.append(self.multivariate_clasp_objects[freq].profile)
+    #             except IndexError:
+    #                 cp = 0
+    #                 score = 0
+    #             change_points.append(cp)
+    #             scores_at_cp.append(score)
+
+    #         if self.mode == 'max': # max score
+    #             # clasp profile score at change point
+    #             # scores_at_cp = [self.multivariate_clasp_objects[freq].profile[pos] for freq in self.frequencies]
+    #             ind = np.argmax(np.abs(scores_at_cp))
+    #             keep_cp = change_points[ind]
+
+    #         elif self.mode == 'mult':
+    #             new_score = np.prod(profiles, axis = 0) #prof_dr * prof_baf * prof_vaf
+    #             new_score[new_score == np.inf] = -10000
+    #             keep_cp = np.argmax(new_score)
+
+    #         elif self.mode == 'sum':
+    #             new_score = np.sum(profiles, axis = 0)
+    #             new_score[new_score == np.inf] = -10000
+    #             keep_cp = np.argmax(new_score/3)
+
+    #         conservative_cps.append(keep_cp)
+
+
+    # def get_all_changepoints(self):
+    #     conservative_cps = []
+    #     # get clasp score from each ts for each validated changepoint
+        
+    #     # find ts with largest number of segments and use that as n_segments
+    #     n_segments = max([len(self.multivariate_clasp_objects[freq].n_segments) for freq in self.frequencies])
+
+    #     # collect all profiles
+    #     all_profiles = [self.multivariate_clasp_objects[freq].profile for freq in self.frequencies]
+    #     all_profiles = np.array([prof for prof in all_profiles if prof.size != 0])
+
+    #     for i in range(n_segments - 1):
+    #     #     if all(len(ls) == 0 for ls in queues):
+    #     #         break
+    #     #     for i in range(len(self.frequencies)):
+
+    #     # for idx, pos in enumerate(self.all_cps):
+    #         # the change point
+    #         change_points = []
+    #         scores_at_cp = []
+    #         profiles = []
+    #         for freq in self.frequencies:
+    #         # change_points = [self.multivariate_clasp_objects[freq].change_points[i] for freq in self.frequencies]
+    #             try:
+    #                 cp = self.multivariate_clasp_objects[freq].change_points[i]
+    #                 score = self.multivariate_clasp_objects[freq].profile[cp]
+    #                 profiles.append(self.multivariate_clasp_objects[freq].profile)
+    #             except IndexError:
+    #                 cp = 0
+    #                 score = 0
+    #             change_points.append(cp)
+    #             scores_at_cp.append(score)
+
+    #         if self.mode == 'max': # max score
+    #             # clasp profile score at change point
+    #             # scores_at_cp = [self.multivariate_clasp_objects[freq].profile[pos] for freq in self.frequencies]
+    #             ind = np.argmax(np.abs(scores_at_cp))
+    #             keep_cp = change_points[ind]
+
+    #         elif self.mode == 'mult':
+    #             new_score = np.prod(all_profiles, axis = 0) #prof_dr * prof_baf * prof_vaf
+    #             new_score[new_score == np.inf] = -10000
+    #             keep_cp = np.argmax(new_score)
+
+    #         elif self.mode == 'sum':
+    #             new_score = np.sum(all_profiles, axis = 0)
+    #             new_score[new_score == np.inf] = -10000
+    #             keep_cp = np.argmax(new_score/3)
+
+    #         conservative_cps.append(keep_cp)
+
+    #         # all_profiles = [self.multivariate_clasp_objects[freq].profile for freq in self.frequencies]
+    #         # all_profiles = np.array([prof for prof in all_profiles if prof.size != 0])
+
+    #     # all_score = [dr_score, baf_score, vaf_score]
+        
+    #     # all_profile = [prof_dr, prof_baf, prof_vaf]
+    #     # all_profile = np.array([prof for prof in all_profile if prof.size != 0])
+    #     # scores_at_cp = [self.multivariate_clasp_objects[freq].profile[pos] for freq in self.frequencies]
+
+    # # TODO: Does not work for a significance test
+    # # need to reverse engineer the calculations from claspy given a new profile
+    # # Can derive clasp.knn.offsets, change_point-clasp.lbound, clasp.window_size from each profile, but how to combine
+    # # would they even be different or are they hard coded based on user parameters?
+
+    def score_changepoints_significance(self):
+        """combine all clasp scores then test if they pass a given score threshold
+        """
+        # list for collecting conservative change points
+        conservative_cps = []
+        # collect all profiles
+        all_profiles = [self.multivariate_clasp_objects[freq].profile for freq in self.frequencies]
+
+        if self.mode == 'max':
+            profile = np.max(all_profiles)
+        elif self.mode == 'mult':
+            profile = np.prod(all_profiles, axis = 0)
+        elif self.mode == 'sum':
+            profile = np.sum(all_profiles, axis = 0)
+        
+        # validate all changepoints with the new clasp profile
+        for i in self.all_cps:
+            if significance_test():
+                conservative_cps.append(i)
+
+
+    def score_changepoints_threshold(self):
+        """combine all clasp scores then test if they pass a given score threshold
+        """
+        # list for collecting conservative change points
+        conservative_cps = []
+        # collect all profiles
+        all_profiles = [self.multivariate_clasp_objects[freq].profile for freq in self.frequencies]
+        # lock threshold as it is updated if mode == mult
+        threshold = self.threshold
+
+        if self.mode == 'max':
+            profile = np.max(all_profiles)
+        elif self.mode == 'mult':
+            profile = np.prod(all_profiles, axis = 0)
+            threshold = threshold * 3
+        elif self.mode == 'sum':
+            profile = np.sum(all_profiles, axis = 0)/3
+        
+        # validate all changepoints with the new clasp profile
+        for i in self.all_cps:
+            if score_threshold(profile=profile, change_point=i, threshold=threshold):
+                conservative_cps.append(i)
+
+
 
     def plot_original_data(self,
                            title: None | str = None,
