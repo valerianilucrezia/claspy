@@ -1,6 +1,5 @@
 from scipy.stats import ranksums
-
-from claspy.nearest_neighbour import cross_val_labels
+import numpy as np
 
 
 def significance_test(offsets, lbound, window_size, change_point, threshold=1e-15):
@@ -55,34 +54,53 @@ def score_threshold(profile, change_point, threshold=0.75):
     """
     return profile[change_point] >= threshold
 
-
-_VALIDATION_MAPPING = {
-    "significance_test": significance_test,
-    "score_threshold": score_threshold
-}
-
-
-def map_validation_tests(validation_method):
+def cross_val_labels(offsets, split_idx, window_size):
     """
-    Maps a validation method name to its corresponding function.
+    Generate predicted and true labels for cross-validation based on nearest neighbour distances.
 
     Parameters
     ----------
-    validation_method : str
-        The name of the validation method to map.
+    offsets : ndarray of shape (n_timepoints, k_neighbours)
+        The indices of the nearest neighbours for each timepoint in the time series. These indices
+        are relative to the start of the time series and should be positive integers.
+    split_idx : int
+        The index at which to split the time series into two potential segments. This index should be
+        less than n_timepoints and greater than window_size.
+    window_size : int
+        The size of the window used to calculate nearest neighbours.
 
     Returns
     -------
-    function
-        The validation function that corresponds to the input method name.
-
-    Raises
-    ------
-    ValueError
-        If the input validation method name is not in the list of implemented methods.
+    y_true : ndarray of shape (n_timepoints,)
+        The true labels for each timepoint in the time series.
+    y_pred : ndarray of shape (n_timepoints,)
+        The predicted labels for each timepoint in the time series.
     """
-    if validation_method not in _VALIDATION_MAPPING:
-        raise ValueError(
-            f"{validation_method} is not a valid validation method. Implementations include: {', '.join(_VALIDATION_MAPPING.keys())}")
+    n_timepoints, k_neighbours = offsets.shape
+    print(n_timepoints)
+    print(k_neighbours)
+    print(split_idx)
 
-    return _VALIDATION_MAPPING[validation_method]
+    y_true = np.concatenate((
+        np.zeros(split_idx, dtype=np.int64),
+        np.ones(n_timepoints - split_idx, dtype=np.int64),
+    ))
+    print(y_true.shape)
+
+    knn_labels = np.zeros(shape=(k_neighbours, n_timepoints), dtype=np.int64)
+    print(knn_labels.shape)
+
+    for i_neighbor in range(k_neighbours):
+        neighbours = offsets[:, i_neighbor]
+        print(neighbours)
+        print(type(neighbours))
+        knn_labels[i_neighbor] = y_true[neighbours]
+
+    ones = np.sum(knn_labels, axis=0)
+    zeros = k_neighbours - ones
+    y_pred = np.asarray(ones > zeros, dtype=np.int64)
+
+    exclusion_zone = np.arange(split_idx - window_size, split_idx)
+    y_pred[exclusion_zone] = 1
+
+    return y_true, y_pred
