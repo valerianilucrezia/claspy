@@ -25,22 +25,11 @@ def main():
     tmp_csv = os.path.join(tmp, "test_csv.csv")
     test_df.to_csv(path_or_buf=tmp_csv, sep=",")
     # csv = pd.read_csv(filepath_or_buffer=tmp_csv, sep=",")
-    multiClasp = MultivariateClaSP(tmp_csv, mode='mult', out_dir=os.path.join(tmp, "out"), threshold=1e-15, window_size='suss')
+    multiClasp = MultivariateClaSP(tmp_csv, mode='max', out_dir=os.path.join(tmp, "out"), threshold=1e-15, window_size='suss')
     multiClasp.analyze_time_series()
-
-    clasp_trees = [multiClasp.multivariate_clasp_objects[freq].clasp_tree for freq in multiClasp.frequencies]
-    clasp_trees_flat = flatten(clasp_trees)
-    clasp = [i[1] for i in clasp_trees_flat]
-    for i in clasp:
-        print(i.knn.offsets)
-        print(i.knn.offsets.shape)
-
-    for i in multiClasp.frequencies:
-        print(multiClasp.multivariate_clasp_objects[i].clasp_tree)
-
-
-    print(clasp_trees_flat)
-    print(clasp)
+    print(f"cps: {multiClasp.all_cps}")
+    multiClasp.score_changepoints_significance()
+    print(multiClasp.all_cps)
 
 if __name__ == "__main__":
     main()
