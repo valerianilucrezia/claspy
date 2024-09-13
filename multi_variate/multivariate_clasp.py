@@ -7,6 +7,7 @@ from scipy.stats import ranksums
 import os
 import numpy as np
 import matplotlib.pyplot as plt
+from multivariate_segmentation import MultivariateClaSPSegmentation, take_first_cp, validate_first_cp, find_cp_iterative
 from claspy.segmentation import BinaryClaSPSegmentation
 from claspy.clasp import ClaSPEnsemble, ClaSP
 from validation import score_threshold, cross_val_labels
@@ -127,112 +128,12 @@ class MultivariateClaSP:
 
         self.multivariate_clasp_objects = {}
         for i in self.frequencies:
-            ts_obj = BinaryClaSPSegmentation(**self.kwargs)
-            ts_obj.fit(original_data[i])
-            # call claspEnsemble to get offsets
-            clasp_kwargs['window_size'] = ts_obj.window_size
-            print(ts_obj.window_size)
-            ts_obj.offsets = ClaSPEnsemble(**clasp_kwargs).fit(original_data[i], threshold=self.threshold, validation=self.validation).knn.offsets
-            print(ts_obj.offsets)
-            self.all_cps.update(ts_obj.change_points)
+            ts_obj = MultivariateClaSPSegmentation(**self.kwargs)
+            ts_obj.initialize(original_data[i])
             self.multivariate_clasp_objects[i] = ts_obj
-
-
-    def score_changepoints_significance(self):
-        """combine all clasp scores then test if they pass a given significance threshold
-        """
         
-        # list for collecting conservative change points
-        conservative_cps = []
-        # collect all profiles
-        arrays = [self.multivariate_clasp_objects[freq].profile for freq in self.frequencies]
-        offsets = [self.multivariate_clasp_objects[freq].offsets for freq in self.frequencies]
-        window_size = [self.multivariate_clasp_objects[freq].window_size for freq in self.frequencies]
-
-        all_profiles = []
-        for i in range(0, len(arrays)):
-            new = np.append(arrays[i], np.full_like(range(0, window_size[i]-1), 0, dtype=np.int64))
-            print(new.shape)
-            all_profiles.append(new)
-        all_profiles = np.stack(arrays=all_profiles, axis=0)
-
-        # 3d array of offsets
-        all_offsets = []
-        for i in range(0, len(offsets)):
-            new = np.append(offsets[i], np.zeros(shape=(window_size[i]-1, self.k_neighbors), dtype=np.int64), axis=0)
-            print(new.shape)
-            all_offsets.append(new)
-        all_offsets = np.dstack(tuple(all_offsets))
-
-        # need to do the same calculation to combine offsets
-        # then test with validation.significance test for each segment
-        if self.mode == 'max':
-            print(all_profiles.shape)
-            idx = np.argmax(np.sum(all_profiles, axis=1))
-            print(idx)
-            profile = all_profiles[idx, :]
-            offsets = all_offsets[:, :, idx]
-        elif self.mode == 'mult':
-            profile = np.prod(all_profiles, axis = 0)
-            offsets = np.prod(all_offsets, axis = 2)
-        elif self.mode == 'sum':
-            profile = np.sum(all_profiles, axis = 0)/len(self.frequencies)
-            offsets = np.sum(all_offsets, axis = 2)/len(self.frequencies)
-        
-        # add ends to changepoints
-        cps_with_ends = sorted(list(self.all_cps.copy()))
-        cps_with_ends.insert(0, 0)
-        cps_with_ends.append(len(profile) - 1)
-        print(cps_with_ends)
-
-        # validate all changepoints with the new clasp profile
-        for i in (1, len(cps_with_ends)-1):
-            offset = offsets[cps_with_ends[i-1]:cps_with_ends[i+1]]
-            print(offset)
-            _, y_pred = cross_val_labels(offsets=offset, split_idx=cps_with_ends[i], window_size=self.window_size)
-            _, p = ranksums(y_pred[:cps_with_ends[i]], y_pred[cps_with_ends[i]:])
-            if p <= self.threshold:
-                conservative_cps.append(cps_with_ends[i])
-        self.all_cps = conservative_cps
-
-
-    def score_changepoints_threshold(self, threshold):
-        """combine all clasp scores then test if they pass a given score threshold
-        """
-        # list for collecting conservative change points
-        conservative_cps = []
-        # collect all profiles
-        arrays = [self.multivariate_clasp_objects[freq].profile for freq in self.frequencies]
-        window_size = [self.multivariate_clasp_objects[freq].window_size for freq in self.frequencies]
-
-        all_profiles = []
-        for i in range(0, len(arrays)):
-            new = np.append(arrays[i], np.full_like(range(0, window_size[i]-1), 0))
-            print(new.shape)
-            all_profiles.append(new)
-        all_profiles = np.stack(arrays=all_profiles, axis=0)
-        print(all_profiles)
-        # lock threshold as it is updated if mode == mult
-        # threshold = self.threshold
-
-        if self.mode == 'max':
-            profile = np.max(all_profiles, axis=0)
-        elif self.mode == 'mult':
-            profile = np.prod(all_profiles, axis = 0)
-            threshold = threshold ** len(self.frequencies)
-        elif self.mode == 'sum':
-            profile = np.sum(all_profiles, axis = 0)/len(self.frequencies)
-        
-        # validate all changepoints with the new clasp profile
-        print(profile)
-        print(threshold)
-        plt.plot(profile)
-        plt.hlines(threshold, xmin=0, xmax=10000)
-        plt.show()
-        for i in self.all_cps:
-            if score_threshold(profile=profile, change_point=i, threshold=threshold):
-                conservative_cps.append(i)
-        self.all_cps = conservative_cps
+        validate_first_cp(self.multivariate_clasp_objects, cp=take_first_cp(self.multivariate_clasp_objects, self.mode))
+        self.all_cps = find_cp_iterative(self.multivariate_clasp_objects, self.mode)
 
 
     def plot_original_data(self,
@@ -249,7 +150,7 @@ class MultivariateClaSP:
 
         for i in range(0, len(variables)):
             profile = self.multivariate_clasp_objects[variables[i]].time_series
-            bps = self.multivariate_clasp_objects[variables[i]].change_points
+            bps = self.all_cps
             axs[i].plot(profile, label=str(variables[i]))
             axs[i].set_ylabel(str(variables[i]))
             axs[i].vlines(bps, ymin = min(profile) - 0.05, ymax = max(profile) + 0.05, colors = 'tab:green', label = 'Predicted BP', linestyles = 'dashed')
