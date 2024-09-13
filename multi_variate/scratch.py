@@ -8,9 +8,19 @@ def flatten(xss):
     return [x for xs in xss for x in xs]
 
 def main():
-    baf_profile, baf_cp = sim_data_baf(ploidy=(2,1), purity=1, size_segment=400, size_ts=10000, prob_baseline=0.95, seed=97)
-    vaf_profile, vaf_cp = sim_data(base_freq_range=(0.25, 0.55), mutant_freq_range=(0.25, 1), seed=93, size_ts=10000, size_segment=400, prob_baseline=0.95)
-    dr_profile, dr_cp = sim_data(base_freq_range=(0.8, 1.1), mutant_freq_range=(1.5, 2.1), seed=74, size_ts=10000, size_segment=400, prob_baseline=0.95)
+    for i in range(0, 100):
+        # baf_profile, baf_cp = sim_data_baf(ploidy=(2,1), purity=1, size_segment=400, size_ts=10000, prob_baseline=0.95, seed=97)
+        vaf_profile, vaf_cp = sim_data(base_freq_range=(0.25, 0.55), mutant_freq_range=(0.25, 1), seed=i, size_ts=10000, size_segment=400, prob_baseline=0.95)
+        dr_profile, dr_cp = sim_data(base_freq_range=(0.8, 1.1), mutant_freq_range=(1.5, 2.1), seed=i, size_ts=10000, size_segment=400, prob_baseline=0.95)
+        baf_profile, baf_cp = sim_data_baf(ploidy=(2,1), purity=1, size_segment=400, size_ts=10000, prob_baseline=0.95, seed=i)
+        print(i)
+        print(baf_cp)
+        print(vaf_cp)
+        print(dr_cp)
+      
+    baf_profile, baf_cp = sim_data_baf(ploidy=(2,1), purity=1, size_segment=400, size_ts=10000, prob_baseline=0.95, seed=37)
+    vaf_profile, vaf_cp = sim_data(base_freq_range=(0.25, 0.55), mutant_freq_range=(0.25, 1), seed=75, size_ts=10000, size_segment=400, prob_baseline=0.95)
+    dr_profile, dr_cp = sim_data(base_freq_range=(0.8, 1.1), mutant_freq_range=(1.5, 2.1), seed=75, size_ts=10000, size_segment=400, prob_baseline=0.95)
 
     # cna_id field is for checking accuracy of change points. Since change points are simulated and thus known already, cna_id here is array of zeros
     test_df = pd.DataFrame({"vaf":vaf_profile, "median_baf":baf_profile, "median_dr":dr_profile, "pos":list(range(0, len(vaf_profile))), "cna_id":np.zeros(len(vaf_profile))})
@@ -25,11 +35,12 @@ def main():
     tmp_csv = os.path.join(tmp, "test_csv.csv")
     test_df.to_csv(path_or_buf=tmp_csv, sep=",")
     # csv = pd.read_csv(filepath_or_buffer=tmp_csv, sep=",")
-    multiClasp = MultivariateClaSP(tmp_csv, mode='max', out_dir=os.path.join(tmp, "out"), threshold=1e-15, window_size='suss')
+    multiClasp = MultivariateClaSP(tmp_csv, mode='max', out_dir=os.path.join(tmp, "out"), threshold=1e-15, window_size=15)
     multiClasp.analyze_time_series()
     print(f"cps: {multiClasp.all_cps}")
-    multiClasp.score_changepoints_significance()
-    print(multiClasp.all_cps)
+    print(vaf_cp)
+    print(baf_cp)
+    multiClasp.plot_original_data()
 
 if __name__ == "__main__":
     main()
