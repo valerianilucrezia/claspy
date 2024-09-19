@@ -40,7 +40,7 @@ def main():
     print(f"cps: {multiClasp.all_cps}")
     print(vaf_cp)
     print(baf_cp)
-    multiClasp.plot_original_data()
+    multiClasp.plot_original_data(save=True)
 
 if __name__ == "__main__":
     main()

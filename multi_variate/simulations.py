@@ -129,15 +129,19 @@ def run_simulations(input: str, mode: str, output: str, sys_path: str, sim: str,
                 
                 for thr in threshold:
 
-                    multivariate_ts = MultivariateClaSP(in_file, mode, output_dir, frequencies, n_segments, n_estimators, wsize, k_neighbors,
-                      distance, score, early_stopping, validation, thr, excl_radius, n_jobs, random_state)
-                    multivariate_ts.analyze_time_series()
+                    try:
 
-                    # save out results
-                    np.save(file = os.path.join(multivariate_ts.out_dir, f'{multivariate_ts.name}_bps.npy'), arr = np.array(multivariate_ts.bps))
-                    np.save(file = os.path.join(multivariate_ts.out_dir, f'{multivariate_ts.name}_cp.npy'), arr = np.array(multivariate_ts.CP))
+                        multivariate_ts = MultivariateClaSP(in_file, mode, output_dir, frequencies, n_segments, n_estimators, wsize, k_neighbors,
+                        distance, score, early_stopping, validation, thr, excl_radius, n_jobs, random_state)
+                        multivariate_ts.analyze_time_series()
 
-                    multivariate_ts.plot_profile(save=True)
+                        # save out results
+                        np.save(file = os.path.join(multivariate_ts.out_dir, f'{multivariate_ts.name}_bps.npy'), arr = np.array(multivariate_ts.bps))
+                        np.save(file = os.path.join(multivariate_ts.out_dir, f'{multivariate_ts.name}_cp.npy'), arr = np.array(multivariate_ts.CP))
+
+                        multivariate_ts.plot_profile(save=True)
+                    except:
+                        print(f"{wsize}_{thr} not passed")
 
 
 if __name__ == '__main__':
