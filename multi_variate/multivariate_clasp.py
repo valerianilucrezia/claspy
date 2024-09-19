@@ -1,10 +1,4 @@
-import sys
-# FIXME if sys.path.append is important should move to be function argument
-# sys.path.append('/orfeo/LTS/LADE/LT_storage/lvaleriani/CNA/segmentation/claspy')
-
 from pathlib import Path
-import os
-import numpy as np
 import matplotlib.pyplot as plt
 from multivariate_segmentation import MultivariateClaSPSegmentation, take_first_cp, validate_first_cp, find_cp_iterative
 from data_import import get_data_csv, get_data_tsv
@@ -61,7 +55,7 @@ class MultivariateClaSP:
 
         # take dict of inherited args to pass to BinaryClaSPSegmentation. Delete params only used with this class
         self.kwargs = locals()
-        for i in ['self', 'input', 'mode', 'out_dir', 'frequencies']:
+        for i in ['self', 'input_path', 'mode', 'out_dir', 'frequencies']:
             del self.kwargs[i]
         # assign as usual
         self.frequencies = frequencies
