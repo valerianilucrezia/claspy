@@ -1,15 +1,6 @@
-import sys
-# FIXME if sys.path.append is important should move to be function argument
-# sys.path.append('/orfeo/LTS/LADE/LT_storage/lvaleriani/CNA/segmentation/claspy')
-
-from pathlib import Path, PosixPath
-from scipy.stats import ranksums
-import os
-import numpy as np
+from pathlib import Path
 import matplotlib.pyplot as plt
-from claspy.segmentation import BinaryClaSPSegmentation
-from claspy.clasp import ClaSPEnsemble, ClaSP
-from validation import score_threshold, cross_val_labels
+from multivariate_segmentation import MultivariateClaSPSegmentation, take_first_cp, validate_first_cp, find_cp_iterative
 from data_import import get_data_csv, get_data_tsv
 
 
@@ -58,17 +49,17 @@ class MultivariateClaSP:
 
     """
     
-    def __init__(self, input: str, mode: str, out_dir: str, frequencies: list=["vaf", "median_baf", "median_dr"], n_segments: str|int="learn",
+    def __init__(self, input_path: str, mode: str, out_dir: str, frequencies: list=["vaf", "median_baf", "median_dr"], n_segments: str|int="learn",
                  n_estimators: int=10, window_size: str|int="suss", k_neighbours: int=3, distance: str="euclidean_distance", score: str="roc_auc", early_stopping: bool=True,
                  validation: str="significance_test", threshold: float=1e-15, excl_radius: int=5, n_jobs: int=1, random_state: int=2357):
 
         # take dict of inherited args to pass to BinaryClaSPSegmentation. Delete params only used with this class
         self.kwargs = locals()
-        for i in ['self', 'input', 'mode', 'out_dir', 'frequencies']:
+        for i in ['self', 'input_path', 'mode', 'out_dir', 'frequencies']:
             del self.kwargs[i]
         # assign as usual
         self.frequencies = frequencies
-        self.input = input
+        self.input = Path(input_path)
         self.mode = mode
         self.out_dir = out_dir
         self.window_size = window_size
@@ -86,19 +77,24 @@ class MultivariateClaSP:
         Raises:
             TypeError: If any given argument is not of correct type.
         """
-        # # TODO more specific error checking
-        # if os.path.isfile(self.input) is True:
-        #     if self.input.endswith(".csv"):
-        #         self.get_data = get_data_csv
-        #     elif self.input.endswith(".tsv"):
-        #         self.get_data = get_data_tsv
-        # else:
-        #     raise TypeError(f"input file must be csv or tsv, not {self.input}")
+        # assign variable to attribute to be called later
+        if self.input.is_file() is True:
+            # access via suffix because it is a pathlib object
+            # if bugs occur in future probably just use str(Path(self.input)).endswith()
+            if self.input.suffix == ".csv":
+                self.get_data = get_data_csv
+            elif self.input.suffix == ".tsv":
+                self.get_data = get_data_tsv
+        else:
+            raise TypeError(f"input file must be csv or tsv, not {str(self.input.suffix)}")
         # should be all that is needed as input is already checked
         if self.out_dir is None:
-            self.out_dir = os.path.dirname(self.input)
-        if os.path.isdir(self.out_dir) is False:
-            os.mkdir(self.out_dir)
+            self.out_dir = self.input.parent
+        else:
+            self.out_dir = Path(self.out_dir)
+        if self.out_dir.exists() is False:
+            self.out_dir.mkdir()
+
         if type(self.mode) != str or self.mode in ["max", "sum", "mult"] is False:
             raise TypeError(f"mode must be string of one of the following options: max, sum, mult")
         # if all(self.kwargs["frequencies"], str) is False:
@@ -111,7 +107,7 @@ class MultivariateClaSP:
         self.name = f'{self.mode}_{self.window_size}_{self.threshold}'
 
         # returns dictionary to preserve variable names
-        original_data = get_data_csv(self.input, self.frequencies)
+        original_data = self.get_data(self.input, self.frequencies)
         # update to account for frequencies not present in input csv
         self.frequencies = original_data.keys()
 
@@ -127,112 +123,12 @@ class MultivariateClaSP:
 
         self.multivariate_clasp_objects = {}
         for i in self.frequencies:
-            ts_obj = BinaryClaSPSegmentation(**self.kwargs)
-            ts_obj.fit(original_data[i])
-            # call claspEnsemble to get offsets
-            clasp_kwargs['window_size'] = ts_obj.window_size
-            print(ts_obj.window_size)
-            ts_obj.offsets = ClaSPEnsemble(**clasp_kwargs).fit(original_data[i], threshold=self.threshold, validation=self.validation).knn.offsets
-            print(ts_obj.offsets)
-            self.all_cps.update(ts_obj.change_points)
+            ts_obj = MultivariateClaSPSegmentation(**self.kwargs)
+            ts_obj.initialize(original_data[i])
             self.multivariate_clasp_objects[i] = ts_obj
-
-
-    def score_changepoints_significance(self):
-        """combine all clasp scores then test if they pass a given significance threshold
-        """
         
-        # list for collecting conservative change points
-        conservative_cps = []
-        # collect all profiles
-        arrays = [self.multivariate_clasp_objects[freq].profile for freq in self.frequencies]
-        offsets = [self.multivariate_clasp_objects[freq].offsets for freq in self.frequencies]
-        window_size = [self.multivariate_clasp_objects[freq].window_size for freq in self.frequencies]
-
-        all_profiles = []
-        for i in range(0, len(arrays)):
-            new = np.append(arrays[i], np.full_like(range(0, window_size[i]-1), 0, dtype=np.int64))
-            print(new.shape)
-            all_profiles.append(new)
-        all_profiles = np.stack(arrays=all_profiles, axis=0)
-
-        # 3d array of offsets
-        all_offsets = []
-        for i in range(0, len(offsets)):
-            new = np.append(offsets[i], np.zeros(shape=(window_size[i]-1, self.k_neighbors), dtype=np.int64), axis=0)
-            print(new.shape)
-            all_offsets.append(new)
-        all_offsets = np.dstack(tuple(all_offsets))
-
-        # need to do the same calculation to combine offsets
-        # then test with validation.significance test for each segment
-        if self.mode == 'max':
-            print(all_profiles.shape)
-            idx = np.argmax(np.sum(all_profiles, axis=1))
-            print(idx)
-            profile = all_profiles[idx, :]
-            offsets = all_offsets[:, :, idx]
-        elif self.mode == 'mult':
-            profile = np.prod(all_profiles, axis = 0)
-            offsets = np.prod(all_offsets, axis = 2)
-        elif self.mode == 'sum':
-            profile = np.sum(all_profiles, axis = 0)/len(self.frequencies)
-            offsets = np.sum(all_offsets, axis = 2)/len(self.frequencies)
-        
-        # add ends to changepoints
-        cps_with_ends = sorted(list(self.all_cps.copy()))
-        cps_with_ends.insert(0, 0)
-        cps_with_ends.append(len(profile) - 1)
-        print(cps_with_ends)
-
-        # validate all changepoints with the new clasp profile
-        for i in (1, len(cps_with_ends)-1):
-            offset = offsets[cps_with_ends[i-1]:cps_with_ends[i+1]]
-            print(offset)
-            _, y_pred = cross_val_labels(offsets=offset, split_idx=cps_with_ends[i], window_size=self.window_size)
-            _, p = ranksums(y_pred[:cps_with_ends[i]], y_pred[cps_with_ends[i]:])
-            if p <= self.threshold:
-                conservative_cps.append(cps_with_ends[i])
-        self.all_cps = conservative_cps
-
-
-    def score_changepoints_threshold(self, threshold):
-        """combine all clasp scores then test if they pass a given score threshold
-        """
-        # list for collecting conservative change points
-        conservative_cps = []
-        # collect all profiles
-        arrays = [self.multivariate_clasp_objects[freq].profile for freq in self.frequencies]
-        window_size = [self.multivariate_clasp_objects[freq].window_size for freq in self.frequencies]
-
-        all_profiles = []
-        for i in range(0, len(arrays)):
-            new = np.append(arrays[i], np.full_like(range(0, window_size[i]-1), 0))
-            print(new.shape)
-            all_profiles.append(new)
-        all_profiles = np.stack(arrays=all_profiles, axis=0)
-        print(all_profiles)
-        # lock threshold as it is updated if mode == mult
-        # threshold = self.threshold
-
-        if self.mode == 'max':
-            profile = np.max(all_profiles, axis=0)
-        elif self.mode == 'mult':
-            profile = np.prod(all_profiles, axis = 0)
-            threshold = threshold ** len(self.frequencies)
-        elif self.mode == 'sum':
-            profile = np.sum(all_profiles, axis = 0)/len(self.frequencies)
-        
-        # validate all changepoints with the new clasp profile
-        print(profile)
-        print(threshold)
-        plt.plot(profile)
-        plt.hlines(threshold, xmin=0, xmax=10000)
-        plt.show()
-        for i in self.all_cps:
-            if score_threshold(profile=profile, change_point=i, threshold=threshold):
-                conservative_cps.append(i)
-        self.all_cps = conservative_cps
+        validate_first_cp(self.multivariate_clasp_objects, cp=take_first_cp(self.multivariate_clasp_objects, self.mode))
+        self.all_cps = find_cp_iterative(self.multivariate_clasp_objects, self.mode)
 
 
     def plot_original_data(self,
@@ -249,7 +145,7 @@ class MultivariateClaSP:
 
         for i in range(0, len(variables)):
             profile = self.multivariate_clasp_objects[variables[i]].time_series
-            bps = self.multivariate_clasp_objects[variables[i]].change_points
+            bps = self.all_cps
             axs[i].plot(profile, label=str(variables[i]))
             axs[i].set_ylabel(str(variables[i]))
             axs[i].vlines(bps, ymin = min(profile) - 0.05, ymax = max(profile) + 0.05, colors = 'tab:green', label = 'Predicted BP', linestyles = 'dashed')
@@ -260,7 +156,7 @@ class MultivariateClaSP:
         fig.tight_layout()
 
         if save:
-            fig.savefig(os.path.join(self.out_dir, f'{self.name}_timeseries.png'), dpi = 500)
+            fig.savefig(self.out_dir / f'{self.name}_timeseries.png', dpi = 500)
 
 
     def plot_combined_profile(self,
@@ -290,4 +186,4 @@ class MultivariateClaSP:
         fig.tight_layout()
 
         if save:
-            fig.savefig(os.path.join(self.out_dir, f'{self.name}_profiles.png'), dpi = 500)
+            fig.savefig(self.out_dir / f'{self.name}_profiles.png', dpi = 500)

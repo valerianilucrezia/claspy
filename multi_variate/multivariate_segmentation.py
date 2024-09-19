@@ -1,12 +1,13 @@
 from claspy.utils import check_input_time_series, check_excl_radius
-from claspy.clasp import ClaSPEnsemble
-from claspy.validation import map_validation_tests
-from claspy.validation import significance_test
-from claspy.segmentation import BinaryClaSPSegmentation
+from claspy.clasp import ClaSPEnsemble, ClaSP
+from claspy.validation import map_validation_tests, significance_test
 import numpy as np
 
 """
-Class: multivariateClaSP
+Note: Some functions are rewritten from base Claspy due to being unable to reference variables and methods needed for computing a multivariate
+Clasp profile in an object oriented manner.
+
+Class: multivariateClaSPSegmentation
 Class that takes in a time series of an allele frequency and finds change points. Inherits from BinaryClaSPSegmentation from claspy package
     Inputs:
         - input: allele frequency time series
@@ -29,27 +30,41 @@ Class that takes in a time series of an allele frequency and finds change points
     get_first_cp: find first change point in a given time series
     """
 
-class MultivariateClaSPSegmentation(BinaryClaSPSegmentation):
-    def __init__(self, time_series, n_segments="learn", n_estimators=10, window_size=5, k_neighbours=3, distance="euclidean_distance", score="roc_auc", early_stopping=True, validation="significance_test", threshold=1e-15, excl_radius=5, n_jobs=1, random_state=2357):
-        super().__init__(n_segments, n_estimators, window_size, k_neighbours, distance, score, early_stopping, validation, threshold, excl_radius, n_jobs, random_state)
-        
-        self.time_series = time_series
-        self.min_seg_size = self.window_size * self.excl_radius
+class MultivariateClaSPSegmentation(ClaSP):
+    def __init__(self, n_segments: str|int="learn",
+                 n_estimators: int=10, window_size: str|int=10, k_neighbours: int=3, distance: str="euclidean_distance", score: str="roc_auc", early_stopping: bool=True,
+                 validation: str="significance_test", threshold: float=1e-15, excl_radius: int=5, n_jobs: int=1, random_state: int=2357):
+        super().__init__(window_size, k_neighbours, distance, score, excl_radius, n_jobs)
 
-    def get_first_cp(self):
-        check_input_time_series(self.time_series)
+        self.min_seg_size = self.window_size * self.excl_radius
+        self.threshold = threshold
+        self.validation = validation
+        self.n_estimators = n_estimators
+        self.n_segments = n_segments
+        self.early_stopping = early_stopping
+        self.random_state = random_state
+        self.score = score
+        self.distance = distance
+        self.n_jobs = n_jobs
+        self.k_neighbours = k_neighbours
+        self.window_size = window_size
+        self.excl_radius = excl_radius
+
+    def initialize(self, time_series):
+        self.time_series = time_series
+        check_input_time_series(time_series)
         check_excl_radius(self.k_neighbours, self.excl_radius)
 
-        n_timepoints = self.time_series.shape[0]
-        min_seg_size = self.window_size * self.excl_radius
+        self.n_timepoints = time_series.shape[0]
+        self.min_seg_size = self.window_size * self.excl_radius
         
         self.queue = []
         self.clasp_tree = []
         
-        if n_segments == "learn":
-            n_segments = self.time_series.shape[0] // min_seg_size
+        if self.n_segments == "learn":
+            self.n_segments = time_series.shape[0] // self.min_seg_size
             
-        self.prange = 0, self.time_series.shape[0]    
+        self.prange = 0, time_series.shape[0]    
         self.clasp = ClaSPEnsemble(n_estimators=self.n_estimators,
                         window_size=self.window_size,
                         k_neighbours=self.k_neighbours,
@@ -58,18 +73,17 @@ class MultivariateClaSPSegmentation(BinaryClaSPSegmentation):
                         early_stopping=self.early_stopping,
                         excl_radius=self.excl_radius,
                         n_jobs=self.n_jobs,
-                        random_state=self.random_state).fit(self.time_series, 
+                        random_state=self.random_state).fit(time_series, 
                                                     validation=self.validation, 
                                                     threshold=self.threshold)
                 
-        self.cp = my_split(self.clasp, self.clasp.profile, validation=self.validation, threshold=self.threshold)
+        self.cp = self.clasp.split(validation=self.validation, threshold=self.threshold)
         # print('first cp',cp)
         # # check if it is valid with significant test
         
         self.profile = self.clasp.profile
-        return(self.clasp, self.profile, self.cp, self.prange, self.clasp_tree, self.queue)
+
     
-    # FIXME not used, so change points aren't validated
     def local_segmentation(self, lbound, ubound, change_points):
 
         if ubound - lbound < 2 * self.min_seg_size: 
@@ -86,21 +100,63 @@ class MultivariateClaSPSegmentation(BinaryClaSPSegmentation):
             n_jobs=self.n_jobs,
             random_state=self.random_state
         ).fit(self.time_series[lbound:ubound], validation=self.validation, threshold=self.threshold)
-        
-        cp = my_split(self.clasp, self.clasp.profile, validation=self.validation, threshold=self.threshold)
+
+        cp = split(self.clasp, validation=self.validation, threshold=self.threshold)
         if cp is None: 
             return self.clasp_tree, self.queue, 0
-        
+
         # FIXME: score is originally a string argument and here (and below) it is reclassified as int. Change name?
-        self.score = self.clasp.profile[cp]
-        
+        tmp_score = self.profile[cp]
+
         if not cp_is_valid(lbound + cp, change_points, self.n_timepoints, self.min_seg_size):  #candidate, change_points, n_timepoints, min_seg_size
-            self.score = 0
+            tmp_score = 0
 
         self.clasp_tree.append(((lbound, ubound), self.clasp))   
-        self.queue.append((-self.score, len(self.clasp_tree) - 1))
-        return self.clasp_tree, self.queue, self.score
+        self.queue.append((-tmp_score, len(self.clasp_tree) - 1))
+        return tmp_score
 
+def split(clasp, sparse=True, validation="significance_test", threshold=1e-15):
+    """
+    Split the input time series into two segments using the change point location.
+
+    Parameters
+    ----------
+    sparse : bool, optional
+        If True, returns only the index of the change point. If False, returns the two segments
+        separated by the change point. Default is True.
+    validation : str, optional
+        The validation method to use for determining the significance of the change point.
+        The available methods are "significance_test" and "score_threshold". Default is
+        "significance_test".
+    threshold : float, optional
+        The threshold value to use for the validation test. If the validation method is
+        "significance_test", this value represents the p-value threshold for rejecting the
+        null hypothesis. If the validation method is "score_threshold", this value represents
+        the threshold score for accepting the change point. Default is 1e-15.
+
+    Returns
+    -------
+    int or tuple
+        If `sparse` is True, returns the index of the change point. If False, returns a tuple
+        of the two time series segments separated by the change point.
+
+    Raises
+    ------
+    ValueError
+        If the `validation` parameter is not one of the available methods.
+    """
+    clasp._check_is_fitted()
+    cp = np.argmax(clasp.profile)
+
+    if validation is not None:
+        validation_test = map_validation_tests(validation)
+        if not validation_test(clasp, cp, threshold): return None
+
+    if sparse is True:
+        return cp
+
+    return clasp.time_series[:cp], clasp.time_series[cp:]
+    
 
 """Function to check that a given change point is valid
     Input:
@@ -125,33 +181,10 @@ def cp_is_valid(candidate,
     return True
 
 
-"""This function can return a value of None if the significance test for the change points is not significant, or return the change point
-    Successive functions that use my_split check that the return value is/not None
-    
-    """
-def my_split(clasp, 
-            profile, 
-            sparse=True, 
-            validation="significance_test", 
-            threshold=1e-15):
-    
-    cp = np.argmax(profile)
-   # print(cp)
-    # FIXME what if the validation test is None? And what is sparse?
-    if validation is not None:
-        validation_test = map_validation_tests(validation)
-        # validation test evaluates to True or False, so if false the cp is not significant
-        if not validation_test(clasp, cp, threshold):
-            return None
-
-    if sparse is True:
-        return cp
-
-
 def take_first_cp(multivariate_clasp_objects: dict, 
                   mode):
     
-    profiles = [i.profiles for i in multivariate_clasp_objects.values()]
+    profiles = [i.profile for i in multivariate_clasp_objects.values()]
     cps = [np.argmax(i) for i in profiles]
     scores = [max(i) for i in profiles]
 
@@ -178,33 +211,43 @@ def validate_first_cp(multivariate_clasp_objects: dict,
     # append clasp object variables
     if any([i.val for i in multivariate_clasp_objects.values()]):
         for ts_obj in multivariate_clasp_objects.values():
-            ts_obj.tree.append((ts_obj.range, ts_obj.clasp))
-            ts_obj.queue.append((-ts_obj.profile[cp], len(ts_obj.tree) - 1))
+            ts_obj.clasp_tree.append((ts_obj.prange, ts_obj.clasp))
+            ts_obj.queue.append((-ts_obj.profile[cp], len(ts_obj.clasp_tree) - 1))
     
-    
-# TODO: Proofread this one
+
 def find_cp_iterative(multivariate_clasp_objects, mode):
+    """Iteratively find changepoints shared between segments.
+
+    Args:
+        multivariate_clasp_objects (dict): Dictionary of initialized multivariateClaSPSegmentation objects for each time series.
+        mode (str): Method used to combine clasp scores and profiles.
+
+    Returns:
+        list: A sorted list of all unique change points shared between time series.
+    """
+
     CP = []
+    for ts_obj in multivariate_clasp_objects.values():
+        ts_obj.scores = []
 
     # n_segments should be the same for each from what I can tell, so just get one
-    n_segments = multivariate_clasp_objects.values()[0].n_segments
+    n_segments = np.max([ts_obj.n_segments for ts_obj in multivariate_clasp_objects.values()])
     
     for _ in range(n_segments - 1):
-        
-        if all([i.queue for i in multivariate_clasp_objects.values()], 0):
+        for i in [len(i.queue) == 0 for i in multivariate_clasp_objects.values()]:
+            print(i)
+        if all([len(i.queue) == 0 for i in multivariate_clasp_objects.values()]):
             print('Stop because queue is empty')
             break
-        # TODO: Make sure it is okay that the class variables are modified, pretty sure it's fine
-        # TODO: is ts_obj.profile, .clasp.profile, and now .prof all the same thing?
         for ts_obj in multivariate_clasp_objects.values():
             if len(ts_obj.queue) > 0:
                 ts_obj.priority, ts_obj.clasp_tree_idx = ts_obj.queue.pop() #dr_queue.get()
-                (ts_obj.lbound, ts_obj.ubound), ts_obj.clasp = ts_obj.tree[ts_obj.clasp_tree_idx]
+                (ts_obj.lbound, ts_obj.ubound), ts_obj.clasp = ts_obj.clasp_tree[ts_obj.clasp_tree_idx]
                 # FIXME: Here if mysplit returns None an error would occur. Possible solution below. Alternative: try except
-                mysplit_ret = my_split(ts_obj.clasp, ts_obj.clasp.profile, validation=ts_obj.validation, threshold=ts_obj.threshold)
-                if mysplit_ret is None:
-                    mysplit_ret = 0
-                ts_obj.cp = ts_obj.lbound + mysplit_ret
+                split_ret = ts_obj.clasp.split(validation=ts_obj.validation, threshold=ts_obj.threshold)
+                if split_ret is None:
+                    split_ret = 0
+                ts_obj.cp = ts_obj.lbound + split_ret
                 ts_obj.profile[ts_obj.lbound:ts_obj.ubound - ts_obj.window_size + 1] = np.max([ts_obj.profile[ts_obj.lbound:ts_obj.ubound - ts_obj.window_size + 1], ts_obj.clasp.profile], axis=0)
                 ts_obj.prof = ts_obj.clasp.profile
             
@@ -213,14 +256,21 @@ def find_cp_iterative(multivariate_clasp_objects, mode):
                 ts_obj.priority = 0
                 ts_obj.prof = np.array([])
             
-        all_bound = [(i.lbound, i.ubound) for i in multivariate_clasp_objects.values()]
+        # all_bound = [(i.lbound, i.ubound) for i in multivariate_clasp_objects.values()]
         
+
         all_cp = [i.cp for i in multivariate_clasp_objects.values()]
         all_score = [i.priority for i in multivariate_clasp_objects.values()]
         
-        all_profile = np.array([i.prof for i in multivariate_clasp_objects.values() if i.prof.size != 0])
+        # fill with -inf to end of array for arrays smaller than max array size
+        all_profile = [i.prof for i in multivariate_clasp_objects.values() if i.prof.shape[0] > 0]
+        max_profile_shape = np.max([i.shape[0] for i in all_profile])
+        for i in range(0, len(all_profile)):
+            if all_profile[i].shape[0] < max_profile_shape:
+                new = np.append(all_profile[i], np.full(shape=(max_profile_shape-all_profile[i].shape[0]), fill_value=-np.inf))
+                all_profile[i] = new
         
-        # TODO: What do these do
+        all_profile = np.array(all_profile)
         if mode == 'max': # max score
             keep_cp = all_cp[np.argmax(np.abs(all_score))]
             
@@ -229,14 +279,16 @@ def find_cp_iterative(multivariate_clasp_objects, mode):
             # TODO: Need test case
             new_score[new_score == np.inf] = -10000
             test_cp = np.argmax(new_score)
-            keep_cp = multivariate_clasp_objects["dr"].lbound + np.argmax(new_score)
+            keep_cp = multivariate_clasp_objects["median_dr"].lbound + np.argmax(new_score)
             
             
         elif mode == 'sum':
             new_score = np.sum(all_profile, axis = 0)
             new_score[new_score == np.inf] = -10000
-            test_cp = np.argmax(new_score/3)
-            keep_cp = multivariate_clasp_objects["dr"].lbound + np.argmax(new_score/3)
+
+            n_series = len(multivariate_clasp_objects.keys())
+            test_cp = np.argmax(new_score/n_series)
+            keep_cp = multivariate_clasp_objects["median_dr"].lbound + np.argmax(new_score/n_series)
             
         
         if mode != 'max':
@@ -250,5 +302,20 @@ def find_cp_iterative(multivariate_clasp_objects, mode):
         
         else:
             CP.append(keep_cp)
+
+        for ts_obj in multivariate_clasp_objects.values():
+            ts_obj.scores.append(-ts_obj.priority)
+        
+        # define new rrange
+        lrange, rrange = (multivariate_clasp_objects["median_dr"].lbound, keep_cp), (keep_cp, multivariate_clasp_objects["median_dr"].ubound) 
+        for prange in (lrange, rrange):
+            
+            low = prange[0]
+            high = prange[1]
+
+            for ts_obj in multivariate_clasp_objects.values():
+                scores_tmp = ts_obj.local_segmentation(low, high, CP)
+                if scores_tmp != None:
+                    ts_obj.scores.append(scores_tmp)
     
-    return CP
+    return sorted(list(set(CP)))
