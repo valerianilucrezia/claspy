@@ -4,7 +4,10 @@ from claspy.validation import map_validation_tests, significance_test
 import numpy as np
 
 """
-Class: multivariateClaSP
+Note: Some functions are rewritten from base Claspy due to being unable to reference variables and methods needed for computing a multivariate
+Clasp profile in an object oriented manner.
+
+Class: multivariateClaSPSegmentation
 Class that takes in a time series of an allele frequency and finds change points. Inherits from BinaryClaSPSegmentation from claspy package
     Inputs:
         - input: allele frequency time series
@@ -211,9 +214,18 @@ def validate_first_cp(multivariate_clasp_objects: dict,
             ts_obj.clasp_tree.append((ts_obj.prange, ts_obj.clasp))
             ts_obj.queue.append((-ts_obj.profile[cp], len(ts_obj.clasp_tree) - 1))
     
-    
-# TODO: Proofread this one
+
 def find_cp_iterative(multivariate_clasp_objects, mode):
+    """Iteratively find changepoints shared between segments.
+
+    Args:
+        multivariate_clasp_objects (dict): Dictionary of initialized multivariateClaSPSegmentation objects for each time series.
+        mode (str): Method used to combine clasp scores and profiles.
+
+    Returns:
+        list: A sorted list of all unique change points shared between time series.
+    """
+
     CP = []
     for ts_obj in multivariate_clasp_objects.values():
         ts_obj.scores = []
@@ -259,7 +271,6 @@ def find_cp_iterative(multivariate_clasp_objects, mode):
                 all_profile[i] = new
         
         all_profile = np.array(all_profile)
-        # TODO: What do these do
         if mode == 'max': # max score
             keep_cp = all_cp[np.argmax(np.abs(all_score))]
             
@@ -274,8 +285,10 @@ def find_cp_iterative(multivariate_clasp_objects, mode):
         elif mode == 'sum':
             new_score = np.sum(all_profile, axis = 0)
             new_score[new_score == np.inf] = -10000
-            test_cp = np.argmax(new_score/3)
-            keep_cp = multivariate_clasp_objects["median_dr"].lbound + np.argmax(new_score/3)
+
+            n_series = len(multivariate_clasp_objects.keys())
+            test_cp = np.argmax(new_score/n_series)
+            keep_cp = multivariate_clasp_objects["median_dr"].lbound + np.argmax(new_score/n_series)
             
         
         if mode != 'max':
