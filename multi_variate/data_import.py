@@ -1,13 +1,14 @@
 import pandas as pd
 import numpy as np
 import warnings
+from pathlib import Path
 
 # specific function to call if input file is a .tsv
-def get_data_tsv(data: str, frequencies: list[str]) -> dict[str, np.ndarray]:
+def get_data_tsv(data: Path, frequencies: list[str]) -> dict[str, np.ndarray]:
     """Extract allele frequency data for specified frequencies from a text file and return as a dictionary.
 
     Args:
-        data (str): Path holding input data file
+        data (pathlib Path): Path holding input data file
 
         frequencies (list[str]): List of frequencies to be extracted and analyzed, should correspond to column names.
 
@@ -36,11 +37,11 @@ def get_data_tsv(data: str, frequencies: list[str]) -> dict[str, np.ndarray]:
 
 # specific funtion to call if a function is a .csv
 # FIXME remove bps/cna_id after we know that sims work
-def get_data_csv(data: str, frequencies: list[str]) -> dict[str, np.ndarray]:
+def get_data_csv(data: Path, frequencies: list[str]) -> dict[str, np.ndarray]:
     """Extract allele frequency data for specified frequencies from a CSV file and return as a dictionary.
 
     Args:
-        data (str): Path holding input data file
+        data (pathlib Path): Path holding input data file
 
         frequencies (list[str]): List of frequencies to be extracted and analyzed, should correspond to column names.
 
