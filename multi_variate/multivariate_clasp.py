@@ -2,15 +2,11 @@ import sys
 # FIXME if sys.path.append is important should move to be function argument
 # sys.path.append('/orfeo/LTS/LADE/LT_storage/lvaleriani/CNA/segmentation/claspy')
 
-from pathlib import Path, PosixPath
-from scipy.stats import ranksums
+from pathlib import Path
 import os
 import numpy as np
 import matplotlib.pyplot as plt
 from multivariate_segmentation import MultivariateClaSPSegmentation, take_first_cp, validate_first_cp, find_cp_iterative
-from claspy.segmentation import BinaryClaSPSegmentation
-from claspy.clasp import ClaSPEnsemble, ClaSP
-from validation import score_threshold, cross_val_labels
 from data_import import get_data_csv, get_data_tsv
 
 
@@ -59,7 +55,7 @@ class MultivariateClaSP:
 
     """
     
-    def __init__(self, input: str, mode: str, out_dir: str, frequencies: list=["vaf", "median_baf", "median_dr"], n_segments: str|int="learn",
+    def __init__(self, input_path: str, mode: str, out_dir: str, frequencies: list=["vaf", "median_baf", "median_dr"], n_segments: str|int="learn",
                  n_estimators: int=10, window_size: str|int="suss", k_neighbours: int=3, distance: str="euclidean_distance", score: str="roc_auc", early_stopping: bool=True,
                  validation: str="significance_test", threshold: float=1e-15, excl_radius: int=5, n_jobs: int=1, random_state: int=2357):
 
@@ -69,7 +65,7 @@ class MultivariateClaSP:
             del self.kwargs[i]
         # assign as usual
         self.frequencies = frequencies
-        self.input = input
+        self.input = Path(input_path)
         self.mode = mode
         self.out_dir = out_dir
         self.window_size = window_size
@@ -87,19 +83,24 @@ class MultivariateClaSP:
         Raises:
             TypeError: If any given argument is not of correct type.
         """
-        # # TODO more specific error checking
-        # if os.path.isfile(self.input) is True:
-        #     if self.input.endswith(".csv"):
-        #         self.get_data = get_data_csv
-        #     elif self.input.endswith(".tsv"):
-        #         self.get_data = get_data_tsv
-        # else:
-        #     raise TypeError(f"input file must be csv or tsv, not {self.input}")
+        # assign variable to attribute to be called later
+        if self.input.is_file() is True:
+            # access via suffix because it is a pathlib object
+            # if bugs occur in future probably just use str(Path(self.input)).endswith()
+            if self.input.suffix == ".csv":
+                self.get_data = get_data_csv
+            elif self.input.suffix == ".tsv":
+                self.get_data = get_data_tsv
+        else:
+            raise TypeError(f"input file must be csv or tsv, not {str(self.input.suffix)}")
         # should be all that is needed as input is already checked
         if self.out_dir is None:
-            self.out_dir = os.path.dirname(self.input)
-        if os.path.isdir(self.out_dir) is False:
-            os.mkdir(self.out_dir)
+            self.out_dir = self.input.parent
+        else:
+            self.out_dir = Path(self.out_dir)
+        if self.out_dir.exists() is False:
+            self.out_dir.mkdir()
+
         if type(self.mode) != str or self.mode in ["max", "sum", "mult"] is False:
             raise TypeError(f"mode must be string of one of the following options: max, sum, mult")
         # if all(self.kwargs["frequencies"], str) is False:
@@ -112,7 +113,7 @@ class MultivariateClaSP:
         self.name = f'{self.mode}_{self.window_size}_{self.threshold}'
 
         # returns dictionary to preserve variable names
-        original_data = get_data_csv(self.input, self.frequencies)
+        original_data = self.get_data(self.input, self.frequencies)
         # update to account for frequencies not present in input csv
         self.frequencies = original_data.keys()
 
@@ -161,7 +162,7 @@ class MultivariateClaSP:
         fig.tight_layout()
 
         if save:
-            fig.savefig(os.path.join(self.out_dir, f'{self.name}_timeseries.png'), dpi = 500)
+            fig.savefig(self.out_dir / f'{self.name}_timeseries.png', dpi = 500)
 
 
     def plot_combined_profile(self,
@@ -191,4 +192,4 @@ class MultivariateClaSP:
         fig.tight_layout()
 
         if save:
-            fig.savefig(os.path.join(self.out_dir, f'{self.name}_profiles.png'), dpi = 500)
+            fig.savefig(self.out_dir / f'{self.name}_profiles.png', dpi = 500)
